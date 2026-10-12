@@ -960,26 +960,12 @@ const toastCallerTitle = document.getElementById('toastCallerTitle');
 const toastCallerType = document.getElementById('toastCallerType');
 const toastAcceptBtn = document.getElementById('toastAcceptBtn');
 const toastDeclineBtn = document.getElementById('toastDeclineBtn');
-const testIncomingCallBtn = document.getElementById('testIncomingCallBtn');
 
 if (toastAcceptBtn) {
   toastAcceptBtn.addEventListener('click', () => acceptIncomingCall('standard'));
 }
 if (toastDeclineBtn) {
   toastDeclineBtn.addEventListener('click', declineIncomingCall);
-}
-
-// Demo button to test how an incoming call looks & rings
-if (testIncomingCallBtn) {
-  testIncomingCallBtn.addEventListener('click', () => {
-    handleIncomingCallNotification({
-      callId: `demo_${Date.now()}`,
-      callerId: '849-210',
-      callType: 'video',
-      isCallWaiting: Boolean(currentCallId)
-    });
-    addLog('Simulating Incoming Call alert. Click Answer to test media!', 'info');
-  });
 }
 
 function handleIncomingCallNotification(data) {
@@ -1026,13 +1012,6 @@ async function acceptIncomingCall(mode = 'standard') {
 
   await initMedia(isAudioOnly);
 
-  // If this was a simulated test call, start local preview UI
-  if (callId.startsWith('demo_')) {
-    startCallSessionUI([{ userId: myUniqueId, displayId: myUniqueId }], activeCallType);
-    closeIncomingModal();
-    return;
-  }
-
   socket.emit('accept-call', {
     callId,
     mode
@@ -1049,9 +1028,7 @@ function declineIncomingCall() {
   const callId = pendingIncomingCall.callId;
   addLog(`[DECLINING CALL] Call from ID #${pendingIncomingCall.callerId} declined`, 'warning');
 
-  if (!callId.startsWith('demo_')) {
-    socket.emit('reject-call', { callId });
-  }
+  socket.emit('reject-call', { callId });
 
   closeIncomingModal();
 }
