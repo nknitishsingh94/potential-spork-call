@@ -39,6 +39,21 @@
         </button>
         <button id="editIdBtn" class="btn-ghost-sm" title="Change or set your custom permanent ID">✏️ Set My ID</button>
       </div>
+      <script>
+        (function() {
+          try {
+            var id = localStorage.getItem('permanent_caller_id');
+            if (!id || id === 'null' || id === 'undefined' || id.trim().length < 3) {
+              var n1 = Math.floor(100 + Math.random() * 900);
+              var n2 = Math.floor(100 + Math.random() * 900);
+              id = n1 + '-' + n2;
+              localStorage.setItem('permanent_caller_id', id);
+            }
+            var el = document.getElementById('myDisplayId');
+            if (el) el.textContent = id;
+          } catch(e) {}
+        })();
+      </script>
     </header>
 
     <!-- Real-time Status Notice -->
@@ -56,6 +71,22 @@
     <main class="main-content">
       <!-- Left Sidebar: Dial Pad & Contacts -->
       <aside class="sidebar">
+        <!-- Permanent Caller ID Spotlight Card -->
+        <div class="sidebar-card my-id-spotlight">
+          <div class="id-spotlight-header">
+            <span class="spotlight-badge">🟢 YOUR PERMANENT NUMBER</span>
+          </div>
+          <div class="id-spotlight-display">
+            <span class="spotlight-icon">🆔</span>
+            <span class="spotlight-digits" id="sidebarCallerId">--- ---</span>
+          </div>
+          <p class="spotlight-sub">Share this 6-digit ID with friends so they can call you directly</p>
+          <div class="spotlight-actions">
+            <button id="spotlightCopyBtn" class="btn-spotlight-copy" title="Copy your permanent ID">📋 Copy ID</button>
+            <button id="spotlightShareBtn" class="btn-spotlight-share" title="Share direct call link">🔗 Share Link</button>
+          </div>
+        </div>
+
         <!-- Direct Dial Card -->
         <div class="sidebar-card dial-card">
           <div class="card-header">
@@ -314,6 +345,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

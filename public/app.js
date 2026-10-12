@@ -6,13 +6,26 @@ function generateUniqueId() {
   return `${n1}-${n2}`;
 }
 
+// Get or generate valid permanent Caller ID with robust error handling
+function getValidUniqueId() {
+  try {
+    let id = localStorage.getItem('permanent_caller_id');
+    if (id && id !== 'null' && id !== 'undefined' && id.trim().length >= 3) {
+      return id.trim();
+    }
+  } catch (e) {
+    console.warn('localStorage read notice', e);
+  }
+  const newId = generateUniqueId();
+  try {
+    localStorage.setItem('permanent_caller_id', newId);
+  } catch (e) {}
+  return newId;
+}
+
 // State variables (PERMANENT ID via localStorage)
 let socket = null;
-let myUniqueId = localStorage.getItem('permanent_caller_id');
-if (!myUniqueId) {
-  myUniqueId = generateUniqueId();
-  localStorage.setItem('permanent_caller_id', myUniqueId);
-}
+let myUniqueId = getValidUniqueId();
 
 let localStream = null;
 let activeCallType = 'video'; // 'video' | 'audio'
@@ -51,6 +64,9 @@ const rtcConfig = {
 
 // UI Elements
 const myDisplayId = document.getElementById('myDisplayId');
+const sidebarCallerId = document.getElementById('sidebarCallerId');
+const spotlightCopyBtn = document.getElementById('spotlightCopyBtn');
+const spotlightShareBtn = document.getElementById('spotlightShareBtn');
 const copyIdBtn = document.getElementById('copyIdBtn');
 const editIdBtn = document.getElementById('editIdBtn');
 const targetIdInput = document.getElementById('targetIdInput');
@@ -108,6 +124,17 @@ const localInterruptionOverlay = document.getElementById('localInterruptionOverl
 // Logs
 const debugLogs = document.getElementById('debugLogs');
 const clearLogsBtn = document.getElementById('clearLogsBtn');
+
+// Synchronously sync all ID displays immediately on script execution
+function updateAllIdDisplays(id) {
+  if (myDisplayId) myDisplayId.textContent = id;
+  if (sidebarCallerId) sidebarCallerId.textContent = id;
+  if (localUserTag) localUserTag.textContent = `Your ID: #${id}`;
+  if (callStatusMessage && (!currentCallId || currentCallPeers.size === 0)) {
+    callStatusMessage.textContent = `Your Permanent ID: #${id} • Ready to make & receive calls`;
+  }
+}
+updateAllIdDisplays(myUniqueId);
 
 // -------------------------------------------------------------
 // Logging Helper
@@ -496,8 +523,7 @@ function connectSocket() {
   }
 
   socket.on('registered-success', (data) => {
-    myDisplayId.textContent = data.displayId;
-    localUserTag.textContent = `Your ID: #${data.displayId}`;
+    updateAllIdDisplays(data.displayId);
     addLog(`Caller ID registered: #${data.displayId}`, 'success');
   });
 
@@ -1211,7 +1237,7 @@ if (targetIdInput) {
 if (startVideoCallBtn) startVideoCallBtn.addEventListener('click', () => initiateCall('video'));
 if (startAudioCallBtn) startAudioCallBtn.addEventListener('click', () => initiateCall('audio'));
 
-// Copy ID
+// Copy ID (Header & Spotlight)
 if (copyIdBtn) {
   copyIdBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(myUniqueId).then(() => {
@@ -1223,27 +1249,45 @@ if (copyIdBtn) {
   });
 }
 
+if (spotlightCopyBtn) {
+  spotlightCopyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(myUniqueId).then(() => {
+      spotlightCopyBtn.innerHTML = '✅ Copied!';
+      setTimeout(() => {
+        spotlightCopyBtn.innerHTML = '📋 Copy ID';
+      }, 2000);
+    });
+  });
+}
+
 // Share Direct Call Link (WhatsApp / Share API)
 const shareLinkBtn = document.getElementById('shareLinkBtn');
+function handleShareInvite() {
+  const inviteUrl = `${window.location.origin}/?call=${encodeURIComponent(myUniqueId)}`;
+  if (navigator.share) {
+    navigator.share({
+      title: 'Video Call Me',
+      text: `Call me on my permanent ID #${myUniqueId}:`,
+      url: inviteUrl
+    }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      if (shareLinkBtn) shareLinkBtn.innerHTML = '<span>✅</span> Copied!';
+      if (spotlightShareBtn) spotlightShareBtn.innerHTML = '✅ Copied!';
+      setTimeout(() => {
+        if (shareLinkBtn) shareLinkBtn.innerHTML = '<span>🔗</span> Share Link';
+        if (spotlightShareBtn) spotlightShareBtn.innerHTML = '🔗 Share Link';
+      }, 2000);
+      alert(`Direct Call Link copied!\n\nSend this link to the other person on WhatsApp:\n${inviteUrl}\n\nWhen they open it, your ID will be auto-filled and ready to call!`);
+    });
+  }
+}
+
 if (shareLinkBtn) {
-  shareLinkBtn.addEventListener('click', () => {
-    const inviteUrl = `${window.location.origin}/?call=${encodeURIComponent(myUniqueId)}`;
-    if (navigator.share) {
-      navigator.share({
-        title: 'Video Call Me',
-        text: `Call me on my permanent ID #${myUniqueId}:`,
-        url: inviteUrl
-      }).catch(() => {});
-    } else {
-      navigator.clipboard.writeText(inviteUrl).then(() => {
-        shareLinkBtn.innerHTML = '<span>✅</span> Copied!';
-        setTimeout(() => {
-          shareLinkBtn.innerHTML = '<span>🔗</span> Share Link';
-        }, 2000);
-        alert(`Direct Call Link copied!\n\nSend this link to the other person on WhatsApp:\n${inviteUrl}\n\nWhen they open it, your ID will be auto-filled and ready to call!`);
-      });
-    }
-  });
+  shareLinkBtn.addEventListener('click', handleShareInvite);
+}
+if (spotlightShareBtn) {
+  spotlightShareBtn.addEventListener('click', handleShareInvite);
 }
 
 // Edit / Customize Permanent Caller ID
@@ -1259,9 +1303,10 @@ if (editIdBtn) {
         formatted = custom.trim();
       }
       myUniqueId = formatted;
-      localStorage.setItem('permanent_caller_id', myUniqueId);
-      myDisplayId.textContent = myUniqueId;
-      localUserTag.textContent = `Your ID: #${myUniqueId}`;
+      try {
+        localStorage.setItem('permanent_caller_id', myUniqueId);
+      } catch (e) {}
+      updateAllIdDisplays(myUniqueId);
       if (socket && socket.connected) {
         socket.emit('register-user', { uniqueId: myUniqueId });
       }
@@ -1533,8 +1578,7 @@ window.addEventListener('touchstart', unlockAudioContext);
 
 // Robust App Initializer
 function initApp() {
-  if (myDisplayId) myDisplayId.textContent = myUniqueId;
-  if (localUserTag) localUserTag.textContent = `Your ID: #${myUniqueId}`;
+  updateAllIdDisplays(myUniqueId);
 
   // Check URL params for direct call (e.g. ?call=849210)
   const urlParams = new URLSearchParams(window.location.search);
