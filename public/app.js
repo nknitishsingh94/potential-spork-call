@@ -508,7 +508,7 @@ function updatePeerHoldUI(peerId, isHeld, reason) {
 async function initiateCall(callType = 'video') {
   const targetId = targetIdInput.value.trim();
   if (!targetId) {
-    alert('Please enter a 6-digit Unique ID to call.');
+    alert('Please enter an ID to call, or click one from the "Active Online IDs" list.');
     targetIdInput.focus();
     return;
   }
@@ -517,14 +517,18 @@ async function initiateCall(callType = 'video') {
   const normMy = myUniqueId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
 
   if (normTarget === normMy) {
-    alert('You cannot call your own Caller ID!');
+    alert('You cannot call your own ID! Please enter the ID of another device or browser window.');
+    return;
+  }
+
+  if (!socket || !socket.connected) {
+    alert('Signaling server is connecting... Please try again in 2 seconds.');
     return;
   }
 
   activeCallType = callType;
-  await initMedia(callType === 'audio');
 
-  addLog(`[OUTGOING] Calling ID #${targetId} (${callType.toUpperCase()})...`, 'signal');
+  addLog(`[OUTGOING] Dialing ID #${targetId} (${callType.toUpperCase()})...`, 'signal');
 
   outgoingTargetName.textContent = `Calling ID #${targetId}`;
   outgoingTargetAvatar.textContent = callType === 'video' ? '📹' : '🎙️';
@@ -534,10 +538,16 @@ async function initiateCall(callType = 'video') {
 
   outgoingCallModal.style.display = 'flex';
 
+  // 1. Send call initiation immediately to server
   socket.emit('initiate-call', {
     targetId,
     callType
   });
+
+  // 2. Prepare local media in background if not ready
+  if (!localStream) {
+    initMedia(callType === 'audio').catch(e => console.warn('Media init notice', e));
+  }
 }
 
 function cancelOutgoingCall() {
@@ -896,16 +906,24 @@ function renderUsersList(users) {
         <div class="user-item-id">#${user.displayId}</div>
         ${statusPill}
       </div>
-      <div>
-        <button class="btn-quick-call" data-id="${user.displayId}">
-          Fill ID
+      <div style="display: flex; gap: 0.35rem;">
+        <button class="btn-dial btn-video btn-sm-quick" data-id="${user.displayId}" title="Video Call #${user.displayId}" style="padding: 0.4rem 0.65rem; font-size: 0.75rem;">
+          📹 Video
+        </button>
+        <button class="btn-dial btn-audio btn-sm-quick" data-id="${user.displayId}" title="Audio Call #${user.displayId}" style="padding: 0.4rem 0.65rem; font-size: 0.75rem;">
+          🎙️ Audio
         </button>
       </div>
     `;
 
-    item.querySelector('.btn-quick-call').addEventListener('click', () => {
+    item.querySelector('.btn-video').addEventListener('click', () => {
       targetIdInput.value = user.displayId;
-      targetIdInput.focus();
+      initiateCall('video');
+    });
+
+    item.querySelector('.btn-audio').addEventListener('click', () => {
+      targetIdInput.value = user.displayId;
+      initiateCall('audio');
     });
 
     usersList.appendChild(item);
@@ -934,10 +952,33 @@ copyIdBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(myUniqueId).then(() => {
     copyIdBtn.innerHTML = '<span>✅</span> Copied!';
     setTimeout(() => {
-      copyIdBtn.innerHTML = '<span>📋</span> Copy';
+      copyIdBtn.innerHTML = '<span>📋</span> Copy ID';
     }, 2000);
   });
 });
+
+// Share Direct Call Link (WhatsApp / Share API)
+const shareLinkBtn = document.getElementById('shareLinkBtn');
+if (shareLinkBtn) {
+  shareLinkBtn.addEventListener('click', () => {
+    const inviteUrl = `${window.location.origin}/?call=${encodeURIComponent(myUniqueId)}`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Video Call Me',
+        text: `Call me on my permanent ID #${myUniqueId}:`,
+        url: inviteUrl
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(inviteUrl).then(() => {
+        shareLinkBtn.innerHTML = '<span>✅</span> Copied!';
+        setTimeout(() => {
+          shareLinkBtn.innerHTML = '<span>🔗</span> Share Link';
+        }, 2000);
+        alert(`Direct Call Link copied!\n\nSend this link to the other person on WhatsApp:\n${inviteUrl}\n\nWhen they open it, your ID will be auto-filled and ready to call!`);
+      });
+    }
+  });
+}
 
 // Edit / Customize Permanent Caller ID
 if (editIdBtn) {
