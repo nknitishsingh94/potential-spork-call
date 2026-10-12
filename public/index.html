@@ -83,26 +83,6 @@
           </div>
         </div>
 
-        <!-- WhatsApp Interruption Test -->
-        <div class="sidebar-card highlight-card">
-          <div class="card-header">
-            <h3>📲 WhatsApp Interruption Test</h3>
-            <span class="badge badge-warning">OS Simulation</span>
-          </div>
-          <p class="card-desc">
-            Simulate what happens when <b>WhatsApp</b> takes audio focus. The call stays connected and callers get <b>RINGING</b> (never Busy!).
-          </p>
-          <div class="interruption-controls">
-            <button id="toggleInterruptionBtn" class="btn-warning">
-              <span class="btn-icon">⚡</span>
-              <span id="interruptionBtnText">Simulate WhatsApp Call (Hold Mic)</span>
-            </button>
-            <div class="interruption-state-banner" id="interruptionStateBanner" style="display: none;">
-              ⚠️ Mic held by WhatsApp. Callers still get RINGING!
-            </div>
-          </div>
-        </div>
-
         <!-- Active Online IDs -->
         <div class="sidebar-card">
           <div class="card-header">
@@ -161,9 +141,9 @@
             <!-- Interruption overlay -->
             <div class="interruption-overlay" id="localInterruptionOverlay" style="display: none;">
               <div class="interruption-content">
-                <span class="interruption-icon">📲</span>
-                <p>Microphone held by WhatsApp Call</p>
-                <small>Session alive • Zero Busy response guaranteed</small>
+                <span class="interruption-icon">⏸️</span>
+                <p>Call Paused / On Hold</p>
+                <small>Session active • Zero-Busy guarantee</small>
               </div>
             </div>
           </div>
@@ -184,12 +164,18 @@
           </div>
         </div>
 
-        <!-- In-Call Floating Control Bar (With Mute & Fullscreen) -->
-        <div class="call-control-bar" id="callControlBar" style="display: none;">
+        <!-- Persistent Floating Control Bar (Mute Mic, Speaker Mute, Video, Fullscreen) -->
+        <div class="call-control-bar" id="callControlBar">
           <!-- Mute/Unmute Mic Button -->
-          <button id="toggleMicBtn" class="control-btn" title="Mute / Unmute Microphone">
+          <button id="toggleMicBtn" class="control-btn" title="Mute / Unmute Your Microphone">
             <span class="icon" id="micBtnIcon">🎤</span>
-            <span class="btn-label" id="micBtnLabel">Mute</span>
+            <span class="btn-label" id="micBtnLabel">Mute Mic</span>
+          </button>
+
+          <!-- Speaker Mute Button (Mute Other Person's Voice) -->
+          <button id="toggleSpeakerBtn" class="control-btn" title="Mute Incoming Sound (Speaker)">
+            <span class="icon" id="speakerBtnIcon">🔊</span>
+            <span class="btn-label" id="speakerBtnLabel">Sound On</span>
           </button>
 
           <!-- Toggle Camera Button -->
@@ -204,8 +190,8 @@
             <span class="btn-label">Full Screen</span>
           </button>
 
-          <!-- End Call Button -->
-          <button id="endCallBtn" class="control-btn btn-danger" title="End Call">
+          <!-- End Call Button (Visible only when in active call) -->
+          <button id="endCallBtn" class="control-btn btn-danger" title="End Call" style="display: none;">
             <span class="icon">🛑</span>
             <span class="btn-label">End Call</span>
           </button>
@@ -236,7 +222,7 @@
           <span class="ring-icon">🔔</span> <span id="outgoingStatusText">RINGING...</span>
         </div>
         <p class="dialog-note" id="outgoingDialogNote">
-          Connecting call. Even if receiver is in another call or on WhatsApp, you get <b>RINGING</b> instead of Busy!
+          Connecting call. Even if receiver is already on another call, you get <b>RINGING</b> instead of Busy!
         </p>
         <button id="cancelOutgoingCallBtn" class="btn-danger btn-pill">Cancel Call</button>
       </div>

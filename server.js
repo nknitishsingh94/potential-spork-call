@@ -343,6 +343,30 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Relay Mute / Camera state to call participants
+  socket.on('peer-media-state', ({ isAudioMuted, isVideoMuted }) => {
+    const fromUserId = socketToUserId.get(socket.id);
+    const user = connectedUsers.get(fromUserId);
+    if (!user || !user.activeCallId) return;
+
+    const call = activeCalls.get(user.activeCallId);
+    if (call) {
+      call.participants.forEach(pid => {
+        if (pid !== fromUserId) {
+          const peer = connectedUsers.get(pid);
+          if (peer?.socketId) {
+            io.to(peer.socketId).emit('peer-media-state-updated', {
+              userId: fromUserId,
+              displayId: user.displayId,
+              isAudioMuted,
+              isVideoMuted
+            });
+          }
+        }
+      });
+    }
+  });
+
   // 7. External Interruption (WhatsApp call takes mic/cam)
   socket.on('external-interruption', ({ isInterrupted, reason }) => {
     const userId = socketToUserId.get(socket.id);

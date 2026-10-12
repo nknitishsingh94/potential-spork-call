@@ -140,7 +140,18 @@ async function initMedia(preferAudioOnly = false) {
     localStream = createSimulatedCanvasStream(myUniqueId);
   }
 
+  // Enforce existing mute states on newly initialized tracks
+  if (localStream) {
+    if (isAudioMuted) {
+      localStream.getAudioTracks().forEach(t => (t.enabled = false));
+    }
+    if (isVideoMuted) {
+      localStream.getVideoTracks().forEach(t => (t.enabled = false));
+    }
+  }
+
   updateLocalMediaUI(preferAudioOnly);
+  updateMuteUI();
 }
 
 function updateLocalMediaUI(isAudioOnly) {
@@ -298,6 +309,21 @@ function connectSocket() {
   socket.on('peer-hold-state', (data) => {
     addLog(`[PEER STATE] ID #${data.displayId} held: ${data.isHeld} (${data.reason})`, 'warning');
     updatePeerHoldUI(data.userId, data.isHeld, data.reason);
+  });
+
+  // Peer Mute / Cam state updated by remote peer
+  socket.on('peer-media-state-updated', (data) => {
+    const badge = document.getElementById(`peer-status-${data.userId}`);
+    if (badge) {
+      if (data.isAudioMuted) {
+        badge.textContent = '🔇 Peer Muted';
+        badge.classList.add('muted-badge');
+      } else {
+        badge.textContent = '⚡ Live';
+        badge.classList.remove('muted-badge');
+      }
+    }
+    addLog(`Peer #${data.displayId} ${data.isAudioMuted ? 'muted their mic 🔇' : 'unmuted mic 🎙️'}`, 'info');
   });
 
   // Call Declined
@@ -465,7 +491,7 @@ function updatePeerHoldUI(peerId, isHeld, reason) {
 
   if (overlay) {
     overlay.style.display = isHeld ? 'flex' : 'none';
-    if (msg) msg.textContent = reason || 'Held by WhatsApp Call';
+    if (msg) msg.textContent = reason || 'Call is on Hold';
   }
   if (badge) {
     badge.textContent = isHeld ? '⏸️ Held' : '⚡ Live';
@@ -501,7 +527,7 @@ async function initiateCall(callType = 'video') {
   outgoingTargetAvatar.textContent = callType === 'video' ? '📹' : '🎙️';
   outgoingStatusText.textContent = 'CONNECTING...';
   outgoingDialogNote.innerHTML =
-    `Connecting call. Even if receiver is in another call or on WhatsApp, you get <b>RINGING</b> instead of Busy!`;
+    `Connecting call. Even if receiver is already on another call, you get <b>RINGING</b> instead of Busy!`;
 
   outgoingCallModal.style.display = 'flex';
 
@@ -702,7 +728,7 @@ function closeIncomingModal() {
 // Call Active Session Management
 // -------------------------------------------------------------
 function startCallSessionUI(participants = [], callType = 'video') {
-  callControlBar.style.display = 'flex';
+  endCallBtn.style.display = 'flex';
   callTimer.style.display = 'block';
   callTypeIndicator.style.display = 'block';
   callTypeBadge.textContent = callType === 'video' ? '📹 VIDEO' : '🎙️ AUDIO';
@@ -710,6 +736,7 @@ function startCallSessionUI(participants = [], callType = 'video') {
 
   startTimer();
   renderCallParticipants(participants);
+  updateMuteUI();
 }
 
 function renderCallParticipants(participants) {
@@ -759,8 +786,8 @@ function endCurrentCallLocal(emitToServer = true) {
   document.querySelectorAll('.remote-card:not(.empty-remote)').forEach(el => el.remove());
   if (remotePlaceholder) remotePlaceholder.style.display = 'flex';
 
-  callControlBar.style.display = 'none';
-  callStatusBar.style.borderColor = 'var(--border-glass)';
+  endCallBtn.style.display = 'none';
+  callStatusBar.style.borderColor = 'var(--border-light)';
   callStatusMessage.textContent = 'Ready • Enter an ID or share your ID';
   stopTimer();
 
@@ -773,42 +800,18 @@ function endCurrentCallLocal(emitToServer = true) {
 function toggleExternalInterruption() {
   isExternalInterrupted = !isExternalInterrupted;
 
-  if (isExternalInterrupted) {
-    toggleInterruptionBtn.classList.add('active');
-    interruptionBtnText.textContent = 'End WhatsApp Call (Resume Mic)';
-    interruptionStateBanner.style.display = 'block';
-    localInterruptionOverlay.style.display = 'flex';
+  if (toggleInterruptionBtn) toggleInterruptionBtn.classList.toggle('active', isExternalInterrupted);
+  if (localInterruptionOverlay) localInterruptionOverlay.style.display = isExternalInterrupted ? 'flex' : 'none';
 
-    if (localStream) {
-      localStream.getTracks().forEach(t => (t.enabled = false));
-    }
+  if (localStream) {
+    localStream.getTracks().forEach(t => (t.enabled = !isExternalInterrupted));
+  }
 
-    addLog('⚠️ WhatsApp Call simulated! Local mic held. Signaling alive with ZERO BUSY.', 'warning');
-
-    if (socket) {
-      socket.emit('external-interruption', {
-        isInterrupted: true,
-        reason: 'WhatsApp Call active (Microphone occupied)'
-      });
-    }
-  } else {
-    toggleInterruptionBtn.classList.remove('active');
-    interruptionBtnText.textContent = 'Simulate WhatsApp Call (Hold Mic)';
-    interruptionStateBanner.style.display = 'none';
-    localInterruptionOverlay.style.display = 'none';
-
-    if (localStream) {
-      localStream.getTracks().forEach(t => (t.enabled = true));
-    }
-
-    addLog('✅ WhatsApp call ended. Local mic restored to app.', 'success');
-
-    if (socket) {
-      socket.emit('external-interruption', {
-        isInterrupted: false,
-        reason: 'Resumed app focus'
-      });
-    }
+  if (socket) {
+    socket.emit('external-interruption', {
+      isInterrupted: isExternalInterrupted,
+      reason: isExternalInterrupted ? 'Audio focus held by system' : 'Resumed'
+    });
   }
 }
 
@@ -838,7 +841,7 @@ function renderUsersList(users) {
 
     let statusPill = `<span class="user-status-pill idle">● Ready</span>`;
     if (user.inExternalCall) {
-      statusPill = `<span class="user-status-pill" style="color:#fbbf24;">📲 WhatsApp</span>`;
+      statusPill = `<span class="user-status-pill" style="color:#d97706; background:#fffbeb;">⏸️ On Hold</span>`;
     } else if (user.inCall) {
       statusPill = `<span class="user-status-pill incall">📞 In Call</span>`;
     }
@@ -913,51 +916,150 @@ declineCallBtn.addEventListener('click', declineIncomingCall);
 // Floating Call Controls
 endCallBtn.addEventListener('click', () => endCurrentCallLocal(true));
 
-// Enhanced Mute / Unmute Microphone
+// -------------------------------------------------------------
+// Comprehensive Mute Management (Microphone & Speaker)
+// -------------------------------------------------------------
 const micBtnIcon = document.getElementById('micBtnIcon');
 const micBtnLabel = document.getElementById('micBtnLabel');
+const speakerBtnIcon = document.getElementById('speakerBtnIcon');
+const speakerBtnLabel = document.getElementById('speakerBtnLabel');
+const toggleSpeakerBtn = document.getElementById('toggleSpeakerBtn');
 
-toggleMicBtn.addEventListener('click', () => {
-  if (localStream) {
-    const audioTracks = localStream.getAudioTracks();
-    if (audioTracks.length > 0) {
-      isAudioMuted = !isAudioMuted;
-      audioTracks.forEach(t => (t.enabled = !isAudioMuted));
-      
-      toggleMicBtn.classList.toggle('is-muted', isAudioMuted);
-      if (micBtnIcon) micBtnIcon.textContent = isAudioMuted ? '🔇' : '🎤';
-      if (micBtnLabel) micBtnLabel.textContent = isAudioMuted ? 'Unmute' : 'Mute';
-      
-      localMicBadge.textContent = isAudioMuted ? '🔇 Muted' : '🎙️ Mic On';
-      localMicBadge.classList.toggle('muted-badge', isAudioMuted);
-      
-      addLog(`Microphone ${isAudioMuted ? 'MUTED' : 'UNMUTED'}`, isAudioMuted ? 'warning' : 'success');
-    }
+let isSpeakerMuted = false;
+
+// 1. Microphone Mute (Stop sending your voice)
+function toggleMicrophoneMute(forced = null) {
+  if (forced !== null) {
+    isAudioMuted = forced;
+  } else {
+    isAudioMuted = !isAudioMuted;
   }
-});
 
-// Camera Toggle
+  // A. Mute local stream tracks
+  if (localStream) {
+    localStream.getAudioTracks().forEach(track => {
+      track.enabled = !isAudioMuted;
+    });
+  }
+
+  // B. Directly mute all WebRTC PeerConnection audio senders (Guarantees peer hears silence)
+  peerConnections.forEach((pc) => {
+    pc.getSenders().forEach((sender) => {
+      if (sender.track && sender.track.kind === 'audio') {
+        sender.track.enabled = !isAudioMuted;
+      }
+    });
+  });
+
+  // C. Update UI elements
+  updateMuteUI();
+
+  // D. Notify connected peers via socket so they see a mute badge
+  if (socket && socket.connected && currentCallId) {
+    socket.emit('peer-media-state', {
+      isAudioMuted,
+      isVideoMuted
+    });
+  }
+
+  addLog(
+    `Microphone ${isAudioMuted ? '🔇 MUTED (Your voice is blocked)' : '🎙️ UNMUTED (Voice active)'}`,
+    isAudioMuted ? 'warning' : 'success'
+  );
+}
+
+function updateMuteUI() {
+  if (toggleMicBtn) {
+    toggleMicBtn.classList.toggle('is-muted', isAudioMuted);
+    if (micBtnIcon) micBtnIcon.textContent = isAudioMuted ? '🔇' : '🎤';
+    if (micBtnLabel) micBtnLabel.textContent = isAudioMuted ? 'Unmute Mic' : 'Mute Mic';
+  }
+
+  if (localMicBadge) {
+    localMicBadge.textContent = isAudioMuted ? '🔇 Muted' : '🎙️ Mic On';
+    localMicBadge.classList.toggle('muted-badge', isAudioMuted);
+  }
+}
+
+toggleMicBtn.addEventListener('click', () => toggleMicrophoneMute());
+
+// Allow clicking the mic badge on the video card to mute as well!
+if (localMicBadge) {
+  localMicBadge.style.cursor = 'pointer';
+  localMicBadge.title = 'Click to Mute / Unmute Mic';
+  localMicBadge.addEventListener('click', () => toggleMicrophoneMute());
+}
+
+// 2. Speaker Mute (Stop hearing the other person's voice)
+function toggleSpeakerMute() {
+  isSpeakerMuted = !isSpeakerMuted;
+
+  // Mute all remote incoming audio / video elements
+  document.querySelectorAll('#videoGrid video:not(#localVideo), audio').forEach(el => {
+    el.muted = isSpeakerMuted;
+  });
+
+  if (toggleSpeakerBtn) {
+    toggleSpeakerBtn.classList.toggle('is-muted', isSpeakerMuted);
+  }
+  if (speakerBtnIcon) speakerBtnIcon.textContent = isSpeakerMuted ? '🔈' : '🔊';
+  if (speakerBtnLabel) speakerBtnLabel.textContent = isSpeakerMuted ? 'Sound Muted' : 'Sound On';
+
+  addLog(
+    `Incoming Speaker ${isSpeakerMuted ? '🔈 MUTED (You will not hear others)' : '🔊 UNMUTED (Hearing others)'}`,
+    isSpeakerMuted ? 'warning' : 'success'
+  );
+}
+
+if (toggleSpeakerBtn) {
+  toggleSpeakerBtn.addEventListener('click', toggleSpeakerMute);
+}
+
+// 3. Camera Toggle (Turn Video Off / On)
 const camBtnIcon = document.getElementById('camBtnIcon');
 const camBtnLabel = document.getElementById('camBtnLabel');
 
-toggleCamBtn.addEventListener('click', () => {
-  if (localStream) {
-    const videoTracks = localStream.getVideoTracks();
-    if (videoTracks.length > 0) {
-      isVideoMuted = !isVideoMuted;
-      videoTracks.forEach(t => (t.enabled = !isVideoMuted));
-      
-      toggleCamBtn.classList.toggle('is-muted', isVideoMuted);
-      if (camBtnIcon) camBtnIcon.textContent = isVideoMuted ? '🚫' : '📹';
-      if (camBtnLabel) camBtnLabel.textContent = isVideoMuted ? 'Start Video' : 'Stop Video';
-      
-      localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Cam On';
-      addLog(`Camera ${isVideoMuted ? 'Turned Off' : 'Turned On'}`, isVideoMuted ? 'warning' : 'success');
-    }
-  }
-});
+function toggleCamera() {
+  isVideoMuted = !isVideoMuted;
 
+  if (localStream) {
+    localStream.getVideoTracks().forEach(t => (t.enabled = !isVideoMuted));
+  }
+
+  // Also toggle peer connection senders
+  peerConnections.forEach((pc) => {
+    pc.getSenders().forEach((sender) => {
+      if (sender.track && sender.track.kind === 'video') {
+        sender.track.enabled = !isVideoMuted;
+      }
+    });
+  });
+
+  if (toggleCamBtn) {
+    toggleCamBtn.classList.toggle('is-muted', isVideoMuted);
+  }
+  if (camBtnIcon) camBtnIcon.textContent = isVideoMuted ? '🚫' : '📹';
+  if (camBtnLabel) camBtnLabel.textContent = isVideoMuted ? 'Start Video' : 'Stop Video';
+
+  if (localCamBadge) {
+    localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Cam On';
+  }
+
+  if (socket && socket.connected && currentCallId) {
+    socket.emit('peer-media-state', {
+      isAudioMuted,
+      isVideoMuted
+    });
+  }
+
+  addLog(`Camera ${isVideoMuted ? 'Turned Off' : 'Turned On'}`, isVideoMuted ? 'warning' : 'success');
+}
+
+toggleCamBtn.addEventListener('click', toggleCamera);
+
+// -------------------------------------------------------------
 // Fullscreen Control Handlers
+// -------------------------------------------------------------
 const videoStageArea = document.getElementById('videoStageArea');
 const headerFullscreenBtn = document.getElementById('headerFullscreenBtn');
 const headerFullscreenIcon = document.getElementById('headerFullscreenIcon');
