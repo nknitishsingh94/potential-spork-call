@@ -14,7 +14,19 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Prevent browser from caching old HTML/JS
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  next();
+});
+
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  lastModified: false,
+  maxAge: 0
+}));
 
 // Helper to normalize Unique IDs (e.g. "849-210" -> "849210")
 function normalizeId(id) {
