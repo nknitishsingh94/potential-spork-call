@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>No-Busy Calling Console | Unique ID & Audio/Video WebRTC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Header with Unique ID Badge -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>Non-Stop Calling System</h1>
+          <p class="subtitle">Direct Unique ID • Zero-Busy Engine • Video & Audio Calls</p>
+        </div>
+      </div>
+
+      <!-- User Unique ID HUD -->
+      <div class="my-id-card">
+        <div class="id-meta">
+          <span class="id-label">YOUR CALLER ID:</span>
+          <span class="id-digits" id="myDisplayId">--- ---</span>
+        </div>
+        <button id="copyIdBtn" class="btn-copy" title="Copy your ID">
+          <span>📋</span> Copy
+        </button>
+        <button id="newIdBtn" class="btn-ghost-sm" title="Generate new ID">🔄 New</button>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      <!-- Left: Dial Pad & Contacts -->
+      <aside class="sidebar">
+        <!-- Direct Dial Card -->
+        <div class="sidebar-card dial-card">
+          <div class="card-header">
+            <h3>📞 Call by Unique ID</h3>
+            <span class="badge badge-accent">Direct Dial</span>
+          </div>
+          <p class="card-desc">
+            Enter the 6-digit Unique ID of the person you want to call.
+          </p>
+
+          <div class="dial-input-wrap">
+            <input 
+              type="text" 
+              id="targetIdInput" 
+              placeholder="e.g. 583-912" 
+              maxlength="10" 
+              autocomplete="off"
+              spellcheck="false"
+            >
+          </div>
+
+          <!-- Dual Call Buttons: Video vs Audio -->
+          <div class="dial-action-grid">
+            <button id="startVideoCallBtn" class="btn-dial btn-video">
+              <span class="btn-icon">📹</span>
+              <div class="dial-btn-text">
+                <b>Video Call</b>
+                <small>Camera & Mic</small>
+              </div>
+            </button>
+
+            <button id="startAudioCallBtn" class="btn-dial btn-audio">
+              <span class="btn-icon">🎙️</span>
+              <div class="dial-btn-text">
+                <b>Audio Call</b>
+                <small>Voice Only</small>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- WhatsApp / System Interruption Card -->
+        <div class="sidebar-card highlight-card">
+          <div class="card-header">
+            <h3>📲 WhatsApp Interruption Test</h3>
+            <span class="badge badge-warning">OS Simulation</span>
+          </div>
+          <p class="card-desc">
+            Simulate what happens when <b>WhatsApp</b> takes your mic. The app stays online and callers get <b>RINGING</b> (never Busy!).
+          </p>
+          <div class="interruption-controls">
+            <button id="toggleInterruptionBtn" class="btn-warning">
+              <span class="btn-icon">⚡</span>
+              <span id="interruptionBtnText">Simulate WhatsApp Call (Hold Mic)</span>
+            </button>
+            <div class="interruption-state-banner" id="interruptionStateBanner" style="display: none;">
+              ⚠️ Mic is temporarily held by WhatsApp. Callers still see RINGING!
+            </div>
+          </div>
+        </div>
+
+        <!-- Online Directory by Unique ID -->
+        <div class="sidebar-card">
+          <div class="card-header">
+            <h3>👥 Active Online IDs</h3>
+            <span class="badge" id="onlineCountBadge">0 Online</span>
+          </div>
+          <p class="card-desc">
+            Click any active ID to auto-fill and call directly:
+          </p>
+          <div class="user-list" id="usersList">
+            <div class="empty-state">No other IDs connected yet...</div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Video/Audio Stage -->
+      <section class="video-stage">
+        <!-- Call Status Bar -->
+        <div class="call-status-bar" id="callStatusBar">
+          <div class="status-indicator">
+            <span class="pulse-dot"></span>
+            <span id="callStatusMessage">Ready • Enter an ID or share your ID</span>
+          </div>
+          <div class="call-type-indicator" id="callTypeIndicator" style="display: none;">
+            <span id="callTypeBadge">📹 VIDEO</span>
+          </div>
+          <div class="call-timer" id="callTimer" style="display: none;">00:00</div>
+        </div>
+
+        <!-- Active Video / Audio Grid -->
+        <div class="video-grid" id="videoGrid">
+          <!-- Local User Stream Card -->
+          <div class="video-card local-card" id="localVideoContainer">
+            <video id="localVideo" autoplay playsinline muted></video>
+            
+            <!-- Audio-only fallback representation -->
+            <div class="audio-only-avatar" id="localAudioOnlyAvatar" style="display: none;">
+              <div class="audio-ring-pulse"></div>
+              <div class="audio-id-badge" id="localAudioIdBadge">YOU</div>
+              <span>Audio Call Active</span>
+            </div>
+
+            <div class="video-overlay">
+              <span class="user-tag" id="localUserTag">ID: Your Screen</span>
+              <div class="stream-badges">
+                <span class="stream-badge" id="localMicBadge">🎙️ Active</span>
+                <span class="stream-badge" id="localCamBadge">📹 Active</span>
+              </div>
+            </div>
+
+            <!-- Interruption overlay -->
+            <div class="interruption-overlay" id="localInterruptionOverlay" style="display: none;">
+              <div class="interruption-content">
+                <span class="interruption-icon">📲</span>
+                <p>Microphone held by WhatsApp Call</p>
+                <small>WebRTC session alive • Zero Busy response guaranteed</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Remote Stream Placeholder -->
+          <div class="video-card remote-card empty-remote" id="remotePlaceholder">
+            <div class="empty-video-placeholder">
+              <div class="placeholder-icon">📞</div>
+              <h3>No Call Connected</h3>
+              <p>Share your <b>Caller ID</b> with a friend or enter their ID to call.</p>
+              <div class="feature-pills">
+                <span class="pill">✔ 0% Busy Tone</span>
+                <span class="pill">✔ Instant Ringing</span>
+                <span class="pill">✔ Call Waiting</span>
+                <span class="pill">✔ Group Merge</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- In-Call Floating Control Bar -->
+        <div class="call-control-bar" id="callControlBar" style="display: none;">
+          <button id="toggleMicBtn" class="control-btn" title="Toggle Mic">
+            <span class="icon">🎤</span>
+          </button>
+          <button id="toggleCamBtn" class="control-btn" title="Toggle Camera">
+            <span class="icon">📹</span>
+          </button>
+          <button id="endCallBtn" class="control-btn btn-danger" title="End Call">
+            <span class="icon">🛑</span>
+            <span class="label">End Call</span>
+          </button>
+        </div>
+
+        <!-- Technical Event Log -->
+        <div class="debug-panel">
+          <div class="debug-header">
+            <h4>📡 Real-time Signaling & Media Event Log</h4>
+            <button id="clearLogsBtn" class="btn-xs">Clear</button>
+          </div>
+          <div class="debug-logs" id="debugLogs">
+            <div class="log-entry log-system">[INIT] System ready. Unique ID generated.</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Modal: Outgoing Call (Caller Screen - Always RINGING, Never Busy!) -->
+    <div class="modal-backdrop" id="outgoingCallModal" style="display: none;">
+      <div class="call-dialog outgoing-dialog">
+        <div class="calling-pulse">
+          <div class="pulse-ring"></div>
+          <div class="pulse-avatar" id="outgoingTargetAvatar">📞</div>
+        </div>
+        <h3 id="outgoingTargetName">Calling ID #...</h3>
+        <div class="call-badge-status" id="outgoingStatusBadge">
+          <span class="ring-icon">🔔</span> <span id="outgoingStatusText">RINGING...</span>
+        </div>
+        <p class="dialog-note" id="outgoingDialogNote">
+          Connecting call. Even if receiver is in another call or on WhatsApp, you get <b>RINGING</b> instead of Busy!
+        </p>
+        <button id="cancelOutgoingCallBtn" class="btn-danger btn-pill">Cancel Call</button>
+      </div>
+    </div>
+
+    <!-- Modal: Incoming Call (Call Waiting HUD - Receiver side) -->
+    <div class="modal-backdrop" id="incomingCallModal" style="display: none;">
+      <div class="call-dialog incoming-dialog">
+        <div class="incoming-header-badge" id="callWaitingNotice" style="display: none;">
+          ⚡ CALL WAITING (You are already in a call)
+        </div>
+        <div class="calling-pulse">
+          <div class="pulse-ring active"></div>
+          <div class="pulse-avatar incoming-avatar" id="incomingCallerAvatar">ID</div>
+        </div>
+        <h3 id="incomingCallerName">Incoming Call from ID #---</h3>
+        <div class="call-type-badge-incoming" id="incomingCallTypeBadge">📹 VIDEO CALL</div>
+        <p class="dialog-note" id="incomingCallSubtitle">
+          Incoming call request received. Caller is hearing a normal Ringing tone.
+        </p>
+
+        <!-- Actions -->
+        <div class="incoming-actions">
+          <button id="acceptCallStandardBtn" class="btn-success btn-large">
+            <span>📞</span> Answer Call
+          </button>
+
+          <div id="callWaitingButtons" class="call-waiting-button-grid" style="display: none;">
+            <button id="acceptAndMergeBtn" class="btn-info btn-large">
+              <span>👥</span> Accept & Merge (Group Call)
+            </button>
+            <button id="acceptAndHoldBtn" class="btn-warning btn-large">
+              <span>🔀</span> Accept & Hold Current Call
+            </button>
+          </div>
+
+          <button id="declineCallBtn" class="btn-danger btn-large">
+            <span>❌</span> Decline
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
