@@ -25,7 +25,12 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   lastModified: false,
-  maxAge: 0
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+  }
 }));
 
 // Helper to normalize Unique IDs (e.g. "849-210" -> "849210")

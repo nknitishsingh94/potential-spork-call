@@ -188,7 +188,9 @@ if (dismissCameraPromptBtn) {
   });
 }
 
-// Multi-tier Media Acquisition
+// Clean & Highly Resilient Physical Media Acquisition Core
+let mediaAcquisitionInProgress = false;
+
 async function acquirePhysicalMedia(preferAudioOnly = false) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     throw new Error('CAMERA_NOT_SUPPORTED_OR_INSECURE_CONTEXT');
@@ -198,174 +200,215 @@ async function acquirePhysicalMedia(preferAudioOnly = false) {
     return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   }
 
-  // Tier 1: Try standard webcam resolution (no rigid facingMode constraint so it works on desktop USB & laptop cams)
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: true
-    });
-    return stream;
-  } catch (err1) {
-    console.warn('Tier 1 ideal video+audio acquisition failed:', err1.name, err1.message);
+  // Release any existing stream tracks BEFORE acquiring new hardware access
+  // CRITICAL on Windows: prevents NotReadableError / TrackStartError device locking
+  if (localStream) {
+    try {
+      localStream.getTracks().forEach(t => t.stop());
+    } catch (e) {}
+    localStream = null;
   }
 
-  // Tier 2: Try basic video + audio without resolution constraints
+  // Stage 1: Standard real camera + audio (no facingMode constraint to avoid Windows driver failures)
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        width: { ideal: 1280, max: 1920 },
+        height: { ideal: 720, max: 1080 }
+      },
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    if (stream && stream.getVideoTracks().length > 0) {
+      return stream;
+    }
+  } catch (errStage1) {
+    console.warn('Stage 1 (HD Video + Audio) note:', errStage1);
+  }
+
+  // Stage 2: Basic unconstrained video + audio
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
       audio: true
     });
-    return stream;
-  } catch (err2) {
-    console.warn('Tier 2 basic video+audio acquisition failed:', err2.name, err2.message);
+    if (stream && stream.getVideoTracks().length > 0) {
+      return stream;
+    }
+  } catch (errStage2) {
+    console.warn('Stage 2 (Basic Video + Audio) note:', errStage2);
   }
 
-  // Tier 3: Try video alone (in case microphone is locked by another app or desktop has no mic)
+  // Stage 3: Video-only first (in case microphone is in use, missing, or blocked)
   let videoStream = null;
-  let videoErr = null;
+  let videoError = null;
   try {
     videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
-    // Try adding audio separately without failing video
-    try {
-      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
-      addLog('Physical Camera & Microphone both acquired!', 'success');
-    } catch (audioErr) {
-      addLog('Physical Camera acquired! (Microphone not available or busy).', 'warning');
+  } catch (errVideo) {
+    videoError = errVideo;
+    console.warn('Stage 3 (Video Only) note:', errVideo);
+  }
+
+  // Try acquiring audio separately
+  let audioStream = null;
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (errAudio) {
+    console.warn('Stage 3 (Audio Only) note:', errAudio);
+  }
+
+  // If physical video succeeded, attach microphone audio (if available) and return
+  if (videoStream && videoStream.getVideoTracks().length > 0) {
+    if (audioStream) {
+      audioStream.getAudioTracks().forEach(t => videoStream.addTrack(t));
     }
     return videoStream;
-  } catch (err3) {
-    videoErr = err3;
-    console.warn('Tier 3 video-only acquisition failed:', err3.name, err3.message);
   }
 
-  // Tier 4: Try audio alone (if device has microphone but no webcam detected)
-  try {
-    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    addLog('Physical Microphone acquired! (No webcam detected - using animated avatar).', 'warning');
-    return audioStream;
-  } catch (err4) {
-    console.warn('Tier 4 audio-only acquisition failed:', err4.name, err4.message);
-    throw videoErr || err4;
+  // If video FAILED, but audio succeeded:
+  // Throw specific error carrying audioStream so initMedia keeps real live microphone voice
+  // and attaches a clean avatar video feed without leaving a dead black box
+  if (audioStream && audioStream.getAudioTracks().length > 0) {
+    const err = new Error('PHYSICAL_VIDEO_UNAVAILABLE');
+    err.audioStream = audioStream;
+    err.originalError = videoError;
+    throw err;
   }
+
+  // If both failed, rethrow the video error or generic error
+  throw videoError || new Error('MEDIA_PERMISSION_OR_DEVICE_UNAVAILABLE');
 }
 
-async function initMedia(preferAudioOnly = false, isUserInitiated = false) {
-  // If we already have a real physical camera stream and this is not a user-initiated retry, keep it
-  if (localStream && !isUsingSimulatedStream && !isUserInitiated) {
+async function initMedia(preferAudioOnly = false, forceRefresh = false) {
+  // Guard against race conditions and concurrent hardware requests
+  if (mediaAcquisitionInProgress) {
     return;
   }
 
-  // 1. Immediately provide an active fallback stream if none exists so video is NEVER black
-  if (!localStream) {
-    localStream = createSimulatedCanvasStream(myUniqueId);
-    isUsingSimulatedStream = true;
-    updateLocalMediaUI(preferAudioOnly);
-    if (localCamBadge) {
-      localCamBadge.textContent = '⌛ Requesting Camera...';
-      localCamBadge.style.background = '#e0e7ff';
-      localCamBadge.style.color = '#3730a3';
+  // If we already have live physical camera tracks and not forcing re-acquisition, keep them
+  if (!forceRefresh && localStream && !isUsingSimulatedStream) {
+    const vTracks = localStream.getVideoTracks();
+    const aTracks = localStream.getAudioTracks();
+    const hasLiveVideo = vTracks.length > 0 && vTracks[0].readyState === 'live';
+    const hasLiveAudio = aTracks.length > 0 && aTracks[0].readyState === 'live';
+
+    if (preferAudioOnly) {
+      if (hasLiveAudio) {
+        vTracks.forEach(t => (t.enabled = false));
+        updateLocalMediaUI(true);
+        return;
+      }
+    } else {
+      if (hasLiveVideo) {
+        vTracks.forEach(t => (t.enabled = !isVideoMuted));
+        updateLocalMediaUI(false);
+        return;
+      }
     }
   }
 
-  addLog('Requesting camera & microphone access from browser...', 'signal');
-
-  // Helper with timeout so browser prompt does not freeze the app in black screen
-  const acquireWithTimeout = (promise, timeoutMs = 8000) => {
-    return Promise.race([
-      promise,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('PERMISSION_PROMPT_TIMEOUT')), timeoutMs)
-      )
-    ]);
-  };
-
+  mediaAcquisitionInProgress = true;
   lastMediaError = null;
 
-  try {
-    // Attempt physical media acquisition with timeout
-    const acquiredStream = await acquireWithTimeout(
-      acquirePhysicalMedia(preferAudioOnly),
-      isUserInitiated ? 25000 : 7000
-    );
-
-    // Stop simulated fallback tracks now that we have real media
-    if (localStream && isUsingSimulatedStream) {
-      localStream.getTracks().forEach(t => t.stop());
-    }
-
-    const hasVideo = acquiredStream.getVideoTracks().length > 0;
-    const hasAudio = acquiredStream.getAudioTracks().length > 0;
-
-    if (!hasVideo && !preferAudioOnly) {
-      // Microphone acquired but no webcam: attach simulated canvas stream
-      const canvasStream = createSimulatedCanvasStream(myUniqueId);
-      const canvasTrack = canvasStream.getVideoTracks()[0];
-      if (canvasTrack) {
-        acquiredStream.addTrack(canvasTrack);
-      }
-      isUsingSimulatedStream = true;
-      showCameraPrompt('📷 Webcam Offline', 'Microphone is active, but no physical webcam was detected.');
-    } else {
-      isUsingSimulatedStream = false;
-      hideCameraPrompt();
-    }
-
-    localStream = acquiredStream;
-    addLog(`Real Physical ${hasVideo ? 'Camera & ' : ''}${hasAudio ? 'Microphone' : ''} activated!`, 'success');
-  } catch (err) {
-    lastMediaError = err;
-    isUsingSimulatedStream = true;
-    console.warn('Physical camera/mic acquisition note:', err);
-
-    let errorTitle = 'Camera Blocked / Not Active';
-    let errorDesc = 'Click below to allow browser access to your physical webcam:';
-
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      errorTitle = '🔒 Camera Permission Blocked';
-      errorDesc = 'Your browser blocked camera permission. Click the lock 🔒 icon in your browser address bar, select "Allow", then click below:';
-      addLog('Camera permission blocked by browser. Please allow camera in address bar.', 'danger');
-    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-      errorTitle = '📷 Camera In Use by Another App';
-      errorDesc = 'Another app (WhatsApp, Zoom, Teams, or another tab) is currently using your camera. Please close it and click below:';
-      addLog('Camera is currently in use by another application.', 'danger');
-    } else if (err.name === 'NotFoundError') {
-      errorTitle = '🚫 No Camera Detected';
-      errorDesc = 'No physical webcam was detected on this device. Connect a webcam and click below:';
-      addLog('No webcam found on this device.', 'warning');
-    } else if (err.message === 'CAMERA_NOT_SUPPORTED_OR_INSECURE_CONTEXT') {
-      errorTitle = '⚠️ Insecure Context (HTTP)';
-      errorDesc = 'Camera requires HTTPS or localhost. If opening from another phone, use the live HTTPS link or localhost.';
-      addLog('Camera requires a secure HTTPS connection or localhost.', 'danger');
-    } else if (err.message === 'PERMISSION_PROMPT_TIMEOUT') {
-      errorTitle = '⌛ Camera Permission Pending';
-      errorDesc = 'Browser camera prompt is waiting or minimized. Click below to open and allow camera:';
-      addLog('Camera permission prompt timed out. Click "Turn On Real Camera" to activate.', 'warning');
-    }
-
-    showCameraPrompt(errorTitle, errorDesc);
-
-    // Ensure fallback stream is active if not already
-    if (!localStream || localStream.getVideoTracks().length === 0) {
-      localStream = createSimulatedCanvasStream(myUniqueId);
-    }
+  if (localCamBadge) {
+    localCamBadge.textContent = '⌛ Starting Camera...';
+    localCamBadge.style.background = '#e0e7ff';
+    localCamBadge.style.color = '#3730a3';
   }
 
-  // Enforce existing mute states on newly initialized tracks
-  if (localStream) {
+  try {
+    const stream = await acquirePhysicalMedia(preferAudioOnly);
+
+    // Stop simulated fallback tracks if any
+    if (localStream && isUsingSimulatedStream) {
+      try { localStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    }
+
+    localStream = stream;
+    isUsingSimulatedStream = false;
+    hideCameraPrompt();
+
+    // Respect existing mute states
     if (isAudioMuted) {
       localStream.getAudioTracks().forEach(t => (t.enabled = false));
     }
     if (isVideoMuted) {
       localStream.getVideoTracks().forEach(t => (t.enabled = false));
     }
+
+    updateLocalMediaUI(preferAudioOnly);
+    updateMuteUI();
+    replaceLocalTracksInPeerConnections();
+    addLog('Physical Webcam & Microphone are active!', 'success');
+  } catch (err) {
+    lastMediaError = err;
+    console.warn('Camera acquisition note:', err);
+
+    let errorTitle = 'Camera Blocked / Not Active';
+    let errorDesc = 'Click below to allow browser access to your physical webcam:';
+
+    const origErr = err.originalError || err;
+
+    if (origErr.name === 'NotAllowedError' || origErr.name === 'PermissionDeniedError') {
+      errorTitle = '🔒 Camera Permission Blocked';
+      errorDesc = 'Browser blocked camera permission. Click the lock 🔒 icon in your browser address bar, set Camera to "Allow", then click below:';
+      addLog('Camera permission blocked by browser. Please allow in address bar.', 'danger');
+    } else if (origErr.name === 'NotReadableError' || origErr.name === 'TrackStartError') {
+      errorTitle = '📷 Camera In Use by Another Tab or App';
+      errorDesc = 'Another tab or application is currently using your camera. Close other video tabs or apps and click below:';
+      addLog('Camera is currently in use by another tab or app.', 'warning');
+    } else if (origErr.name === 'NotFoundError') {
+      errorTitle = '🚫 No Webcam Detected';
+      errorDesc = 'No physical webcam found on this device. Plug in a webcam and click below:';
+      addLog('No webcam detected on this device.', 'warning');
+    } else if (err.message === 'CAMERA_NOT_SUPPORTED_OR_INSECURE_CONTEXT') {
+      errorTitle = '⚠️ Insecure Context (HTTP)';
+      errorDesc = 'Camera requires HTTPS or localhost.';
+      addLog('Camera requires a secure HTTPS connection or localhost.', 'danger');
+    } else {
+      addLog(`Camera notice: ${origErr.name || origErr.message}`, 'warning');
+    }
+
+    // If audio was acquired successfully, use it and attach canvas avatar for video
+    let fallbackStream = null;
+    if (err.audioStream) {
+      fallbackStream = err.audioStream;
+      const canvasStream = createSimulatedCanvasStream(myUniqueId);
+      const canvasVideoTrack = canvasStream.getVideoTracks()[0];
+      if (canvasVideoTrack) {
+        fallbackStream.addTrack(canvasVideoTrack);
+      }
+    } else {
+      fallbackStream = createSimulatedCanvasStream(myUniqueId);
+    }
+
+    if (localStream) {
+      try { localStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    }
+
+    localStream = fallbackStream;
+    isUsingSimulatedStream = true;
+
+    // Respect existing mute states
+    if (isAudioMuted) {
+      localStream.getAudioTracks().forEach(t => (t.enabled = false));
+    }
+    if (isVideoMuted) {
+      localStream.getVideoTracks().forEach(t => (t.enabled = false));
+    }
+
+    updateLocalMediaUI(preferAudioOnly);
+    updateMuteUI();
+    replaceLocalTracksInPeerConnections();
+
+    // Show non-blocking toast so user can 1-click retry
+    showCameraPrompt(errorTitle, errorDesc);
+  } finally {
+    mediaAcquisitionInProgress = false;
   }
-
-  updateLocalMediaUI(preferAudioOnly);
-  updateMuteUI();
-
-  // If in an active call, replace tracks in all peer connections so the other person sees real camera
-  replaceLocalTracksInPeerConnections();
 }
 
 function updateLocalMediaUI(isAudioOnly) {
@@ -375,6 +418,8 @@ function updateLocalMediaUI(isAudioOnly) {
     localAudioIdBadge.textContent = myUniqueId;
     localCamBadge.textContent = '📹 Off';
     localCamBadge.style.opacity = '0.5';
+    localCamBadge.style.background = '#f1f5f9';
+    localCamBadge.style.color = '#64748b';
   } else {
     localVideo.style.display = 'block';
     localAudioOnlyAvatar.style.display = 'none';
@@ -382,12 +427,33 @@ function updateLocalMediaUI(isAudioOnly) {
       localVideo.srcObject = localStream;
     }
     localVideo.muted = true;
-    localVideo.play().catch(e => console.warn('Local video play notice', e));
-    localCamBadge.textContent = isUsingSimulatedStream ? '⚠️ Camera Offline' : '📹 Real Camera Active';
-    localCamBadge.style.opacity = '1';
-    localCamBadge.style.background = isUsingSimulatedStream ? '#fef3c7' : '#dcfce7';
-    localCamBadge.style.color = isUsingSimulatedStream ? '#92400e' : '#15803d';
+    localVideo.setAttribute('playsinline', '');
+    localVideo.setAttribute('muted', '');
+    localVideo.autoplay = true;
+    const playPromise = localVideo.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(e => console.warn('Local video play notice', e));
+    }
+
+    if (isUsingSimulatedStream) {
+      localCamBadge.textContent = '⚠️ Webcam In Use / Offline';
+      localCamBadge.style.opacity = '1';
+      localCamBadge.style.background = '#fef3c7';
+      localCamBadge.style.color = '#92400e';
+    } else {
+      localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Camera Live';
+      localCamBadge.style.opacity = '1';
+      localCamBadge.style.background = isVideoMuted ? '#f1f5f9' : '#dcfce7';
+      localCamBadge.style.color = isVideoMuted ? '#64748b' : '#15803d';
+    }
   }
+}
+
+// Auto-play on metadata load
+if (localVideo) {
+  localVideo.onloadedmetadata = () => {
+    localVideo.play().catch(e => console.warn('Video loadedmetadata play notice', e));
+  };
 }
 
 function replaceLocalTracksInPeerConnections() {
@@ -1435,15 +1501,22 @@ function toggleCamera() {
   // If currently using simulated fallback stream or no physical camera, clicking turns on real camera
   if (isUsingSimulatedStream || !localStream || localStream.getVideoTracks().length === 0) {
     addLog('Requesting physical webcam access...', 'signal');
+    hideCameraPrompt();
+    initMedia(false, true);
+    return;
+  }
+
+  const vTracks = localStream.getVideoTracks();
+  if (vTracks.length === 0 || vTracks.some(t => t.readyState === 'ended')) {
+    addLog('Webcam track ended, re-acquiring...', 'signal');
+    hideCameraPrompt();
     initMedia(false, true);
     return;
   }
 
   isVideoMuted = !isVideoMuted;
 
-  if (localStream) {
-    localStream.getVideoTracks().forEach(t => (t.enabled = !isVideoMuted));
-  }
+  vTracks.forEach(t => (t.enabled = !isVideoMuted));
 
   // Also toggle peer connection senders
   peerConnections.forEach((pc) => {
@@ -1461,7 +1534,9 @@ function toggleCamera() {
   if (camBtnLabel) camBtnLabel.textContent = isVideoMuted ? 'Start Video' : 'Stop Video';
 
   if (localCamBadge) {
-    localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Real Camera Active';
+    localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Camera Live';
+    localCamBadge.style.background = isVideoMuted ? '#f1f5f9' : '#dcfce7';
+    localCamBadge.style.color = isVideoMuted ? '#64748b' : '#15803d';
   }
 
   if (socket && socket.connected && currentCallId) {
@@ -1482,6 +1557,16 @@ if (localCamBadge) {
   localCamBadge.style.cursor = 'pointer';
   localCamBadge.title = 'Click to activate or toggle camera';
   localCamBadge.addEventListener('click', toggleCamera);
+}
+
+// Auto-detect newly plugged in or unblocked camera devices
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    addLog('Hardware media device change detected', 'info');
+    if (isUsingSimulatedStream) {
+      initMedia(false, true);
+    }
+  });
 }
 
 // -------------------------------------------------------------
