@@ -1050,25 +1050,39 @@ body {
 }
 
 .btn-large {
-  padding: 0.85rem 1.25rem;
+  padding: 0.95rem 1.4rem;
   border-radius: var(--radius-md);
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 800;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   transition: all 0.2s ease;
+  letter-spacing: 0.02em;
 }
 
 .btn-success {
   background: linear-gradient(135deg, #059669, #10b981);
   color: white;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
 }
 .btn-success:hover {
   background: #059669;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5);
+}
+
+/* Pulsing Receive Button */
+.btn-receive-pulse {
+  animation: receivePulse 1.8s infinite ease-in-out;
+}
+
+@keyframes receivePulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+  50% { transform: scale(1.02); box-shadow: 0 0 0 12px rgba(16, 185, 129, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
 .btn-info {
@@ -1087,6 +1101,124 @@ body {
 }
 .btn-danger:hover {
   background: #dc2626;
+}
+
+/* INCOMING CALL MODAL ENHANCEMENTS */
+.incoming-backdrop {
+  z-index: 999999 !important;
+  background: rgba(15, 23, 42, 0.82) !important;
+  backdrop-filter: blur(14px) !important;
+}
+
+.incoming-dialog {
+  border: 2px solid #a7f3d0 !important;
+  box-shadow: 0 25px 60px -10px rgba(16, 185, 129, 0.35), 0 10px 25px -5px rgba(0, 0, 0, 0.2) !important;
+  max-width: 500px !important;
+  padding: 2.5rem 2rem !important;
+}
+
+.incoming-alert-tag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #059669;
+  margin-bottom: 0.25rem;
+  animation: pulseWarning 1.5s infinite;
+}
+
+.incoming-caller-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.01em;
+}
+
+.ring-delay {
+  animation-delay: 0.8s;
+}
+
+/* TOP HEADS-UP TOAST BANNER */
+.incoming-toast-banner {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000000;
+  background: #ffffff;
+  border: 2px solid #10b981;
+  border-radius: var(--radius-full);
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 12px 35px -5px rgba(16, 185, 129, 0.35);
+  animation: slideDownToast 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownToast {
+  from { top: -80px; opacity: 0; }
+  to { top: 1.25rem; opacity: 1; }
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toast-avatar-ring {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #10b981;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  animation: rippleToast 1.5s infinite;
+}
+
+@keyframes rippleToast {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.toast-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-toast-green {
+  background: #10b981;
+  border: none;
+  color: white;
+  padding: 0.45rem 0.95rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-toast-green:hover { background: #059669; }
+
+.btn-toast-red {
+  background: #ef4444;
+  border: none;
+  color: white;
+  padding: 0.45rem 0.95rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-toast-red:hover { background: #dc2626; }
+
+.preview-card {
+  border-color: #c7d2fe;
 }
 
 .btn-xs {

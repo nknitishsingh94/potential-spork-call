@@ -96,6 +96,24 @@
             <div class="empty-state">No other IDs connected yet...</div>
           </div>
         </div>
+
+        <!-- Preview Test Card -->
+        <div class="sidebar-card preview-card">
+          <div class="card-header">
+            <h3>🔔 Test Incoming Call UI</h3>
+            <span class="badge badge-accent">Demo</span>
+          </div>
+          <p class="card-desc">
+            Click to test how someone's incoming call and ringtone look on your device:
+          </p>
+          <button id="testIncomingCallBtn" class="btn-dial btn-audio" style="width: 100%; justify-content: center;">
+            <span class="btn-icon">🔔</span>
+            <div class="dial-btn-text">
+              <b>Preview Incoming Call</b>
+              <small>Ringtone & Answer Screen</small>
+            </div>
+          </button>
+        </div>
       </aside>
 
       <!-- Center & Right: Video Stage -->
@@ -228,25 +246,44 @@
       </div>
     </div>
 
-    <!-- Modal: Incoming Call (Call Waiting HUD - Receiver side) -->
-    <div class="modal-backdrop" id="incomingCallModal" style="display: none;">
+    <!-- Top Floating Heads-Up Banner for Incoming Calls -->
+    <div class="incoming-toast-banner" id="incomingToastBanner" style="display: none;">
+      <div class="toast-content">
+        <div class="toast-avatar-ring">📞</div>
+        <div>
+          <b id="toastCallerTitle">ID #--- is calling you!</b>
+          <div id="toastCallerType" style="font-size: 0.75rem; color: #475569;">Incoming Video Call</div>
+        </div>
+      </div>
+      <div class="toast-btns">
+        <button id="toastAcceptBtn" class="btn-toast-green">📞 Answer</button>
+        <button id="toastDeclineBtn" class="btn-toast-red">❌ Decline</button>
+      </div>
+    </div>
+
+    <!-- Modal: Incoming Call (Unmissable Real Phone Incoming Screen) -->
+    <div class="modal-backdrop incoming-backdrop" id="incomingCallModal" style="display: none;">
       <div class="call-dialog incoming-dialog">
         <div class="incoming-header-badge" id="callWaitingNotice" style="display: none;">
           ⚡ CALL WAITING (You are already in a call)
         </div>
-        <div class="calling-pulse">
+        
+        <div class="calling-pulse incoming-ring-pulse">
           <div class="pulse-ring active"></div>
-          <div class="pulse-avatar incoming-avatar" id="incomingCallerAvatar">ID</div>
+          <div class="pulse-ring active ring-delay"></div>
+          <div class="pulse-avatar incoming-avatar" id="incomingCallerAvatar">📞</div>
         </div>
-        <h3 id="incomingCallerName">Incoming Call from ID #---</h3>
+
+        <div class="incoming-alert-tag">🔔 INCOMING CALL RINGING...</div>
+        <h2 class="incoming-caller-title" id="incomingCallerName">ID #--- IS CALLING</h2>
         <div class="call-type-badge-incoming" id="incomingCallTypeBadge">📹 VIDEO CALL</div>
         <p class="dialog-note" id="incomingCallSubtitle">
-          Incoming call request received. Caller is hearing a normal Ringing tone.
+          Caller is ringing on your ID. Click below to receive the call:
         </p>
 
         <div class="incoming-actions">
-          <button id="acceptCallStandardBtn" class="btn-success btn-large">
-            <span>📞</span> Answer Call
+          <button id="acceptCallStandardBtn" class="btn-success btn-large btn-receive-pulse">
+            <span class="btn-action-icon">📞</span> RECEIVE / ANSWER CALL
           </button>
 
           <div id="callWaitingButtons" class="call-waiting-button-grid" style="display: none;">
@@ -259,7 +296,7 @@
           </div>
 
           <button id="declineCallBtn" class="btn-danger btn-large">
-            <span>❌</span> Decline
+            <span>❌</span> DECLINE / REJECT
           </button>
         </div>
       </div>

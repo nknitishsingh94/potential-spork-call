@@ -658,12 +658,43 @@ window.addEventListener('click', requestNotificationPerm, { once: true });
 // -------------------------------------------------------------
 // Incoming Call Handling (Receiver side - Zero Busy + Call Waiting)
 // -------------------------------------------------------------
+const incomingToastBanner = document.getElementById('incomingToastBanner');
+const toastCallerTitle = document.getElementById('toastCallerTitle');
+const toastCallerType = document.getElementById('toastCallerType');
+const toastAcceptBtn = document.getElementById('toastAcceptBtn');
+const toastDeclineBtn = document.getElementById('toastDeclineBtn');
+const testIncomingCallBtn = document.getElementById('testIncomingCallBtn');
+
+if (toastAcceptBtn) {
+  toastAcceptBtn.addEventListener('click', () => acceptIncomingCall('standard'));
+}
+if (toastDeclineBtn) {
+  toastDeclineBtn.addEventListener('click', declineIncomingCall);
+}
+
+// Demo button to test how an incoming call looks & rings
+if (testIncomingCallBtn) {
+  testIncomingCallBtn.addEventListener('click', () => {
+    handleIncomingCallNotification({
+      callId: `demo_${Date.now()}`,
+      callerId: '849-210',
+      callType: 'video',
+      isCallWaiting: Boolean(currentCallId)
+    });
+    addLog('Simulating Incoming Call alert. Click Answer to test media!', 'info');
+  });
+}
+
 function handleIncomingCallNotification(data) {
   pendingIncomingCall = data;
 
-  incomingCallerName.textContent = `Call from ID #${data.callerId}`;
+  incomingCallerName.textContent = `ID #${data.callerId} IS CALLING`;
   incomingCallerAvatar.textContent = data.callType === 'video' ? '📹' : '🎙️';
   incomingCallTypeBadge.textContent = data.callType === 'video' ? '📹 VIDEO CALL' : '🎙️ AUDIO CALL';
+
+  if (toastCallerTitle) toastCallerTitle.textContent = `ID #${data.callerId} is calling you!`;
+  if (toastCallerType) toastCallerType.textContent = data.callType === 'video' ? '📹 Incoming Video Call' : '🎙️ Incoming Audio Call';
+  if (incomingToastBanner) incomingToastBanner.style.display = 'flex';
 
   if (data.isCallWaiting) {
     callWaitingNotice.style.display = 'block';
@@ -674,7 +705,7 @@ function handleIncomingCallNotification(data) {
   } else {
     callWaitingNotice.style.display = 'none';
     incomingCallSubtitle.textContent =
-      `Incoming call request. Caller is hearing a normal Ringing tone.`;
+      `Caller is ringing on your ID. Click below to receive the call:`;
     acceptCallStandardBtn.style.display = 'flex';
     callWaitingButtons.style.display = 'none';
   }
@@ -698,6 +729,13 @@ async function acceptIncomingCall(mode = 'standard') {
 
   await initMedia(isAudioOnly);
 
+  // If this was a simulated test call, start local preview UI
+  if (callId.startsWith('demo_')) {
+    startCallSessionUI([{ userId: myUniqueId, displayId: myUniqueId }], activeCallType);
+    closeIncomingModal();
+    return;
+  }
+
   socket.emit('accept-call', {
     callId,
     mode
@@ -714,13 +752,17 @@ function declineIncomingCall() {
   const callId = pendingIncomingCall.callId;
   addLog(`[DECLINING CALL] Call from ID #${pendingIncomingCall.callerId} declined`, 'warning');
 
-  socket.emit('reject-call', { callId });
+  if (!callId.startsWith('demo_')) {
+    socket.emit('reject-call', { callId });
+  }
+
   closeIncomingModal();
 }
 
 function closeIncomingModal() {
   stopRingtoneAlert();
   incomingCallModal.style.display = 'none';
+  if (incomingToastBanner) incomingToastBanner.style.display = 'none';
   pendingIncomingCall = null;
 }
 
