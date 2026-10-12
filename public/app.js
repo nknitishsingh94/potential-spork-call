@@ -524,6 +524,112 @@ function closeOutgoingModal() {
 }
 
 // -------------------------------------------------------------
+// Audible Ringtone Synthesizer & Notification Alerts
+// -------------------------------------------------------------
+let ringtoneAudioContext = null;
+let ringtoneInterval = null;
+let originalPageTitle = document.title;
+let titleFlashTimer = null;
+
+function startRingtoneAlert(callerId) {
+  // 1. Play realistic telephone ringing sound via Web Audio API
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      if (!ringtoneAudioContext) {
+        ringtoneAudioContext = new AudioCtx();
+      }
+      if (ringtoneAudioContext.state === 'suspended') {
+        ringtoneAudioContext.resume();
+      }
+
+      function playSingleBurst() {
+        if (!ringtoneAudioContext) return;
+        const now = ringtoneAudioContext.currentTime;
+
+        const osc1 = ringtoneAudioContext.createOscillator();
+        const osc2 = ringtoneAudioContext.createOscillator();
+        const gain = ringtoneAudioContext.createGain();
+
+        // Standard 440Hz + 480Hz dual-frequency telephone ring
+        osc1.frequency.setValueAtTime(440, now);
+        osc2.frequency.setValueAtTime(480, now);
+
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ringtoneAudioContext.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + 1.8);
+        osc2.stop(now + 1.8);
+      }
+
+      playSingleBurst();
+      clearInterval(ringtoneInterval);
+      ringtoneInterval = setInterval(playSingleBurst, 3000);
+    }
+  } catch (err) {
+    console.warn('Web Audio Ringtone not supported', err);
+  }
+
+  // 2. Mobile vibration pattern (500ms vibe, 250ms pause, 500ms vibe)
+  if (navigator.vibrate) {
+    navigator.vibrate([500, 250, 500, 250, 600]);
+  }
+
+  // 3. Tab Title Flashing (works even if user is in another tab!)
+  clearInterval(titleFlashTimer);
+  let isAlt = false;
+  titleFlashTimer = setInterval(() => {
+    document.title = isAlt ? `🔔 INCOMING CALL (#${callerId})` : `📞 Click to Answer!`;
+    isAlt = !isAlt;
+  }, 750);
+
+  // 4. Desktop Notification (if user is in background)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(`Incoming Call from ID #${callerId}`, {
+        body: 'Click here to answer the call!',
+        icon: '📞'
+      });
+    } catch(e) {}
+  }
+}
+
+function stopRingtoneAlert() {
+  if (ringtoneInterval) {
+    clearInterval(ringtoneInterval);
+    ringtoneInterval = null;
+  }
+  if (ringtoneAudioContext) {
+    try {
+      ringtoneAudioContext.close();
+    } catch (e) {}
+    ringtoneAudioContext = null;
+  }
+  if (titleFlashTimer) {
+    clearInterval(titleFlashTimer);
+    titleFlashTimer = null;
+  }
+  document.title = originalPageTitle;
+  if (navigator.vibrate) {
+    navigator.vibrate(0); // stop vibration
+  }
+}
+
+// Request notification permission once on user interaction
+function requestNotificationPerm() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+window.addEventListener('click', requestNotificationPerm, { once: true });
+
+// -------------------------------------------------------------
 // Incoming Call Handling (Receiver side - Zero Busy + Call Waiting)
 // -------------------------------------------------------------
 function handleIncomingCallNotification(data) {
@@ -548,10 +654,15 @@ function handleIncomingCallNotification(data) {
   }
 
   incomingCallModal.style.display = 'flex';
+
+  // Start sound and vibration!
+  startRingtoneAlert(data.callerId);
 }
 
 async function acceptIncomingCall(mode = 'standard') {
   if (!pendingIncomingCall) return;
+
+  stopRingtoneAlert();
 
   const callId = pendingIncomingCall.callId;
   const isAudioOnly = pendingIncomingCall.callType === 'audio';
@@ -572,6 +683,8 @@ async function acceptIncomingCall(mode = 'standard') {
 function declineIncomingCall() {
   if (!pendingIncomingCall) return;
 
+  stopRingtoneAlert();
+
   const callId = pendingIncomingCall.callId;
   addLog(`[DECLINING CALL] Call from ID #${pendingIncomingCall.callerId} declined`, 'warning');
 
@@ -580,6 +693,7 @@ function declineIncomingCall() {
 }
 
 function closeIncomingModal() {
+  stopRingtoneAlert();
   incomingCallModal.style.display = 'none';
   pendingIncomingCall = null;
 }
