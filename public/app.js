@@ -18,10 +18,12 @@ let localStream = null;
 let activeCallType = 'video'; // 'video' | 'audio'
 let isAudioMuted = false;
 let isVideoMuted = false;
+let isSpeakerMuted = false;
 let isExternalInterrupted = false;
 
 // Active WebRTC connections: peerUserId -> RTCPeerConnection
 const peerConnections = new Map();
+const pendingIceCandidates = new Map(); // peerUserId -> Array<RTCIceCandidate>
 
 // Active Call state
 let currentCallId = null;
@@ -120,28 +122,206 @@ function addLog(message, type = 'info') {
 }
 
 // -------------------------------------------------------------
-// Initialize Local Media Stream
+// Real Physical Camera & Media Acquisition Core
 // -------------------------------------------------------------
-async function initMedia(preferAudioOnly = false) {
-  // Stop existing tracks if any
-  if (localStream) {
-    localStream.getTracks().forEach(t => t.stop());
+let isUsingSimulatedStream = false;
+let lastMediaError = null;
+
+const cameraPromptOverlay = document.getElementById('cameraPromptOverlay');
+const cameraPromptTitle = document.getElementById('cameraPromptTitle');
+const cameraPromptDesc = document.getElementById('cameraPromptDesc');
+const turnOnCameraBtn = document.getElementById('turnOnCameraBtn');
+const dismissCameraPromptBtn = document.getElementById('dismissCameraPromptBtn');
+
+function showCameraPrompt(title, desc) {
+  if (cameraPromptOverlay) {
+    if (cameraPromptTitle) cameraPromptTitle.textContent = title;
+    if (cameraPromptDesc) cameraPromptDesc.textContent = desc;
+    cameraPromptOverlay.style.display = 'flex';
+  }
+}
+
+function hideCameraPrompt() {
+  if (cameraPromptOverlay) {
+    cameraPromptOverlay.style.display = 'none';
+  }
+}
+
+if (turnOnCameraBtn) {
+  turnOnCameraBtn.addEventListener('click', () => {
+    addLog('User clicked Turn On Real Camera button...', 'signal');
+    initMedia(false, true);
+  });
+}
+
+if (dismissCameraPromptBtn) {
+  dismissCameraPromptBtn.addEventListener('click', () => {
+    hideCameraPrompt();
+    addLog('Camera prompt dismissed. Click "Start Video" or camera badge anytime to activate webcam.', 'info');
+  });
+}
+
+// Multi-tier Media Acquisition
+async function acquirePhysicalMedia(preferAudioOnly = false) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('CAMERA_NOT_SUPPORTED_OR_INSECURE_CONTEXT');
   }
 
+  if (preferAudioOnly) {
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  }
+
+  // Tier 1: Try standard webcam resolution (no rigid facingMode constraint so it works on desktop USB & laptop cams)
   try {
-    if (preferAudioOnly) {
-      localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      addLog('Audio microphone stream acquired', 'success');
-    } else {
-      localStream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: { width: { ideal: 640 }, height: { ideal: 480 } }
-      });
-      addLog('Camera & Microphone stream acquired', 'success');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: true
+    });
+    return stream;
+  } catch (err1) {
+    console.warn('Tier 1 ideal video+audio acquisition failed:', err1.name, err1.message);
+  }
+
+  // Tier 2: Try basic video + audio without resolution constraints
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: true
+    });
+    return stream;
+  } catch (err2) {
+    console.warn('Tier 2 basic video+audio acquisition failed:', err2.name, err2.message);
+  }
+
+  // Tier 3: Try video alone (in case microphone is locked by another app or desktop has no mic)
+  let videoStream = null;
+  let videoErr = null;
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+    // Try adding audio separately without failing video
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioStream.getAudioTracks().forEach(track => videoStream.addTrack(track));
+      addLog('Physical Camera & Microphone both acquired!', 'success');
+    } catch (audioErr) {
+      addLog('Physical Camera acquired! (Microphone not available or busy).', 'warning');
     }
-  } catch (err) {
-    addLog(`Physical camera/mic not available (${err.name}). Using simulated fallback stream.`, 'warning');
+    return videoStream;
+  } catch (err3) {
+    videoErr = err3;
+    console.warn('Tier 3 video-only acquisition failed:', err3.name, err3.message);
+  }
+
+  // Tier 4: Try audio alone (if device has microphone but no webcam detected)
+  try {
+    const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    addLog('Physical Microphone acquired! (No webcam detected - using animated avatar).', 'warning');
+    return audioStream;
+  } catch (err4) {
+    console.warn('Tier 4 audio-only acquisition failed:', err4.name, err4.message);
+    throw videoErr || err4;
+  }
+}
+
+async function initMedia(preferAudioOnly = false, isUserInitiated = false) {
+  // If we already have a real physical camera stream and this is not a user-initiated retry, keep it
+  if (localStream && !isUsingSimulatedStream && !isUserInitiated) {
+    return;
+  }
+
+  // 1. Immediately provide an active fallback stream if none exists so video is NEVER black
+  if (!localStream) {
     localStream = createSimulatedCanvasStream(myUniqueId);
+    isUsingSimulatedStream = true;
+    updateLocalMediaUI(preferAudioOnly);
+    if (localCamBadge) {
+      localCamBadge.textContent = '⌛ Requesting Camera...';
+      localCamBadge.style.background = '#e0e7ff';
+      localCamBadge.style.color = '#3730a3';
+    }
+  }
+
+  addLog('Requesting camera & microphone access from browser...', 'signal');
+
+  // Helper with timeout so browser prompt does not freeze the app in black screen
+  const acquireWithTimeout = (promise, timeoutMs = 8000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('PERMISSION_PROMPT_TIMEOUT')), timeoutMs)
+      )
+    ]);
+  };
+
+  lastMediaError = null;
+
+  try {
+    // Attempt physical media acquisition with timeout
+    const acquiredStream = await acquireWithTimeout(
+      acquirePhysicalMedia(preferAudioOnly),
+      isUserInitiated ? 25000 : 7000
+    );
+
+    // Stop simulated fallback tracks now that we have real media
+    if (localStream && isUsingSimulatedStream) {
+      localStream.getTracks().forEach(t => t.stop());
+    }
+
+    const hasVideo = acquiredStream.getVideoTracks().length > 0;
+    const hasAudio = acquiredStream.getAudioTracks().length > 0;
+
+    if (!hasVideo && !preferAudioOnly) {
+      // Microphone acquired but no webcam: attach simulated canvas stream
+      const canvasStream = createSimulatedCanvasStream(myUniqueId);
+      const canvasTrack = canvasStream.getVideoTracks()[0];
+      if (canvasTrack) {
+        acquiredStream.addTrack(canvasTrack);
+      }
+      isUsingSimulatedStream = true;
+      showCameraPrompt('📷 Webcam Offline', 'Microphone is active, but no physical webcam was detected.');
+    } else {
+      isUsingSimulatedStream = false;
+      hideCameraPrompt();
+    }
+
+    localStream = acquiredStream;
+    addLog(`Real Physical ${hasVideo ? 'Camera & ' : ''}${hasAudio ? 'Microphone' : ''} activated!`, 'success');
+  } catch (err) {
+    lastMediaError = err;
+    isUsingSimulatedStream = true;
+    console.warn('Physical camera/mic acquisition note:', err);
+
+    let errorTitle = 'Camera Blocked / Not Active';
+    let errorDesc = 'Click below to allow browser access to your physical webcam:';
+
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errorTitle = '🔒 Camera Permission Blocked';
+      errorDesc = 'Your browser blocked camera permission. Click the lock 🔒 icon in your browser address bar, select "Allow", then click below:';
+      addLog('Camera permission blocked by browser. Please allow camera in address bar.', 'danger');
+    } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+      errorTitle = '📷 Camera In Use by Another App';
+      errorDesc = 'Another app (WhatsApp, Zoom, Teams, or another tab) is currently using your camera. Please close it and click below:';
+      addLog('Camera is currently in use by another application.', 'danger');
+    } else if (err.name === 'NotFoundError') {
+      errorTitle = '🚫 No Camera Detected';
+      errorDesc = 'No physical webcam was detected on this device. Connect a webcam and click below:';
+      addLog('No webcam found on this device.', 'warning');
+    } else if (err.message === 'CAMERA_NOT_SUPPORTED_OR_INSECURE_CONTEXT') {
+      errorTitle = '⚠️ Insecure Context (HTTP)';
+      errorDesc = 'Camera requires HTTPS or localhost. If opening from another phone, use the live HTTPS link or localhost.';
+      addLog('Camera requires a secure HTTPS connection or localhost.', 'danger');
+    } else if (err.message === 'PERMISSION_PROMPT_TIMEOUT') {
+      errorTitle = '⌛ Camera Permission Pending';
+      errorDesc = 'Browser camera prompt is waiting or minimized. Click below to open and allow camera:';
+      addLog('Camera permission prompt timed out. Click "Turn On Real Camera" to activate.', 'warning');
+    }
+
+    showCameraPrompt(errorTitle, errorDesc);
+
+    // Ensure fallback stream is active if not already
+    if (!localStream || localStream.getVideoTracks().length === 0) {
+      localStream = createSimulatedCanvasStream(myUniqueId);
+    }
   }
 
   // Enforce existing mute states on newly initialized tracks
@@ -156,6 +336,9 @@ async function initMedia(preferAudioOnly = false) {
 
   updateLocalMediaUI(preferAudioOnly);
   updateMuteUI();
+
+  // If in an active call, replace tracks in all peer connections so the other person sees real camera
+  replaceLocalTracksInPeerConnections();
 }
 
 function updateLocalMediaUI(isAudioOnly) {
@@ -168,10 +351,49 @@ function updateLocalMediaUI(isAudioOnly) {
   } else {
     localVideo.style.display = 'block';
     localAudioOnlyAvatar.style.display = 'none';
-    localVideo.srcObject = localStream;
-    localCamBadge.textContent = '📹 Active';
+    if (localVideo.srcObject !== localStream) {
+      localVideo.srcObject = localStream;
+    }
+    localVideo.muted = true;
+    localVideo.play().catch(e => console.warn('Local video play notice', e));
+    localCamBadge.textContent = isUsingSimulatedStream ? '⚠️ Camera Offline' : '📹 Real Camera Active';
     localCamBadge.style.opacity = '1';
+    localCamBadge.style.background = isUsingSimulatedStream ? '#fef3c7' : '#dcfce7';
+    localCamBadge.style.color = isUsingSimulatedStream ? '#92400e' : '#15803d';
   }
+}
+
+function replaceLocalTracksInPeerConnections() {
+  if (!localStream) return;
+  const videoTrack = localStream.getVideoTracks()[0];
+  const audioTrack = localStream.getAudioTracks()[0];
+
+  peerConnections.forEach((pc) => {
+    let hasVideoSender = false;
+    let hasAudioSender = false;
+
+    pc.getSenders().forEach((sender) => {
+      const kind = (sender.track && sender.track.kind) || null;
+      if (kind === 'video') {
+        hasVideoSender = true;
+        if (videoTrack) {
+          sender.replaceTrack(videoTrack).catch(e => console.warn('replaceTrack video error', e));
+        }
+      } else if (kind === 'audio') {
+        hasAudioSender = true;
+        if (audioTrack) {
+          sender.replaceTrack(audioTrack).catch(e => console.warn('replaceTrack audio error', e));
+        }
+      }
+    });
+
+    if (!hasVideoSender && videoTrack) {
+      try { pc.addTrack(videoTrack, localStream); } catch (e) {}
+    }
+    if (!hasAudioSender && audioTrack) {
+      try { pc.addTrack(audioTrack, localStream); } catch (e) {}
+    }
+  });
 }
 
 // Simulated fallback canvas stream for testing without physical webcam
@@ -189,34 +411,36 @@ function createSimulatedCanvasStream(idLabel) {
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
 
-    // Pulse circle
+    // Glowing outer ring
     ctx.beginPath();
-    ctx.arc(cx, cy, 75 + Math.sin(angle) * 6, 0, Math.PI * 2);
-    ctx.strokeStyle = '#6366f1';
-    ctx.lineWidth = 4;
+    ctx.arc(cx, cy, 80 + Math.sin(angle) * 8, 0, Math.PI * 2);
+    ctx.strokeStyle = '#4f46e5';
+    ctx.lineWidth = 3;
     ctx.stroke();
 
+    // Pulse circle
     ctx.beginPath();
     ctx.arc(cx, cy, 65, 0, Math.PI * 2);
     ctx.fillStyle = '#1e1b4b';
     ctx.fill();
 
+    // ID text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px monospace';
+    ctx.font = 'bold 24px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`ID #${idLabel}`, cx, cy - 8);
 
     ctx.font = '14px sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText('Simulated WebRTC Feed', cx, cy + 26);
+    ctx.fillText('Simulated WebRTC Feed', cx, cy + 28);
 
-    angle += 0.05;
-    requestAnimationFrame(draw);
+    angle += 0.06;
   }
   draw();
+  setInterval(draw, 1000 / 25);
 
-  const stream = canvas.captureStream(30);
+  const stream = canvas.captureStream(25);
 
   // Silent audio track fallback
   try {
@@ -376,11 +600,26 @@ function connectSocket() {
     endCurrentCallLocal(false);
   });
 
+  // Helper to drain buffered ICE candidates once remoteDescription is set
+  async function processPendingIceCandidates(peerId, pc) {
+    if (!pendingIceCandidates.has(peerId) || !pc || !pc.remoteDescription) return;
+    const queue = pendingIceCandidates.get(peerId);
+    pendingIceCandidates.delete(peerId);
+    for (const candidate of queue) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (err) {
+        console.warn(`Error adding queued ICE candidate for peer ${peerId}:`, err);
+      }
+    }
+  }
+
   // WebRTC Signals
   socket.on('webrtc-offer', async ({ fromUserId, offer, callId }) => {
     addLog(`[WebRTC] Received Offer from ID #${fromUserId}`, 'signal');
     const pc = await getOrCreatePeerConnection(fromUserId);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await processPendingIceCandidates(fromUserId, pc);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -396,17 +635,25 @@ function connectSocket() {
     const pc = peerConnections.get(fromUserId);
     if (pc) {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      await processPendingIceCandidates(fromUserId, pc);
     }
   });
 
   socket.on('ice-candidate', async ({ fromUserId, candidate }) => {
+    if (!candidate) return;
     const pc = peerConnections.get(fromUserId);
-    if (pc && candidate) {
+    if (pc && pc.remoteDescription && pc.remoteDescription.type) {
       try {
         await pc.addIceCandidate(new RTCIceCandidate(candidate));
       } catch (e) {
         console.warn('ICE candidate error', e);
       }
+    } else {
+      // Buffer until remoteDescription is set
+      if (!pendingIceCandidates.has(fromUserId)) {
+        pendingIceCandidates.set(fromUserId, []);
+      }
+      pendingIceCandidates.get(fromUserId).push(candidate);
     }
   });
 }
@@ -458,8 +705,14 @@ async function getOrCreatePeerConnection(peerId, peerDisplayId = peerId) {
   };
 
   pc.ontrack = (event) => {
-    addLog(`[WebRTC] Remote media track received from ID #${peerDisplayId}`, 'success');
-    attachRemoteStream(peerId, peerDisplayId, event.streams[0]);
+    addLog(`[WebRTC] Remote media track (${event.track.kind}) received from ID #${peerDisplayId}`, 'success');
+    let remoteStream;
+    if (event.streams && event.streams[0]) {
+      remoteStream = event.streams[0];
+    } else {
+      remoteStream = new MediaStream([event.track]);
+    }
+    attachRemoteStream(peerId, peerDisplayId, remoteStream);
   };
 
   return pc;
@@ -504,7 +757,17 @@ function attachRemoteStream(peerId, peerDisplayId, stream) {
 
   const video = card.querySelector('video');
   if (video) {
-    video.srcObject = stream;
+    if (!video.srcObject) {
+      video.srcObject = stream;
+    } else if (stream && video.srcObject !== stream) {
+      stream.getTracks().forEach(t => {
+        if (!video.srcObject.getTracks().some(existing => existing.id === t.id)) {
+          video.srcObject.addTrack(t);
+        }
+      });
+    }
+    video.muted = isSpeakerMuted;
+    video.play().catch(e => console.warn('Remote video play notice', e));
   }
 }
 
@@ -856,6 +1119,7 @@ function endCurrentCallLocal(emitToServer = true) {
 
   peerConnections.forEach(pc => pc.close());
   peerConnections.clear();
+  pendingIceCandidates.clear();
   currentCallPeers.clear();
   currentCallId = null;
 
@@ -956,27 +1220,31 @@ function renderUsersList(users) {
 // -------------------------------------------------------------
 
 // Auto-format input as XXX-XXX
-targetIdInput.addEventListener('input', (e) => {
-  let val = e.target.value.replace(/[^0-9]/g, '');
-  if (val.length > 3) {
-    val = `${val.slice(0, 3)}-${val.slice(3, 6)}`;
-  }
-  e.target.value = val;
-});
+if (targetIdInput) {
+  targetIdInput.addEventListener('input', (e) => {
+    let val = e.target.value.replace(/[^0-9]/g, '');
+    if (val.length > 3) {
+      val = `${val.slice(0, 3)}-${val.slice(3, 6)}`;
+    }
+    e.target.value = val;
+  });
+}
 
 // Call Buttons
-startVideoCallBtn.addEventListener('click', () => initiateCall('video'));
-startAudioCallBtn.addEventListener('click', () => initiateCall('audio'));
+if (startVideoCallBtn) startVideoCallBtn.addEventListener('click', () => initiateCall('video'));
+if (startAudioCallBtn) startAudioCallBtn.addEventListener('click', () => initiateCall('audio'));
 
 // Copy ID
-copyIdBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(myUniqueId).then(() => {
-    copyIdBtn.innerHTML = '<span>✅</span> Copied!';
-    setTimeout(() => {
-      copyIdBtn.innerHTML = '<span>📋</span> Copy ID';
-    }, 2000);
+if (copyIdBtn) {
+  copyIdBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(myUniqueId).then(() => {
+      copyIdBtn.innerHTML = '<span>✅</span> Copied!';
+      setTimeout(() => {
+        copyIdBtn.innerHTML = '<span>📋</span> Copy ID';
+      }, 2000);
+    });
   });
-});
+}
 
 // Share Direct Call Link (WhatsApp / Share API)
 const shareLinkBtn = document.getElementById('shareLinkBtn');
@@ -1027,14 +1295,14 @@ if (editIdBtn) {
 }
 
 // Outgoing / Incoming Call Modal handlers
-cancelOutgoingCallBtn.addEventListener('click', cancelOutgoingCall);
-acceptCallStandardBtn.addEventListener('click', () => acceptIncomingCall('standard'));
-acceptAndMergeBtn.addEventListener('click', () => acceptIncomingCall('merge'));
-acceptAndHoldBtn.addEventListener('click', () => acceptIncomingCall('standard'));
-declineCallBtn.addEventListener('click', declineIncomingCall);
+if (cancelOutgoingCallBtn) cancelOutgoingCallBtn.addEventListener('click', cancelOutgoingCall);
+if (acceptCallStandardBtn) acceptCallStandardBtn.addEventListener('click', () => acceptIncomingCall('standard'));
+if (acceptAndMergeBtn) acceptAndMergeBtn.addEventListener('click', () => acceptIncomingCall('merge'));
+if (acceptAndHoldBtn) acceptAndHoldBtn.addEventListener('click', () => acceptIncomingCall('standard'));
+if (declineCallBtn) declineCallBtn.addEventListener('click', declineIncomingCall);
 
 // Floating Call Controls
-endCallBtn.addEventListener('click', () => endCurrentCallLocal(true));
+if (endCallBtn) endCallBtn.addEventListener('click', () => endCurrentCallLocal(true));
 
 // -------------------------------------------------------------
 // Comprehensive Mute Management (Microphone & Speaker)
@@ -1045,7 +1313,7 @@ const speakerBtnIcon = document.getElementById('speakerBtnIcon');
 const speakerBtnLabel = document.getElementById('speakerBtnLabel');
 const toggleSpeakerBtn = document.getElementById('toggleSpeakerBtn');
 
-let isSpeakerMuted = false;
+// (isSpeakerMuted state is tracked in top-level variables)
 
 // 1. Microphone Mute (Stop sending your voice)
 function toggleMicrophoneMute(forced = null) {
@@ -1101,7 +1369,9 @@ function updateMuteUI() {
   }
 }
 
-toggleMicBtn.addEventListener('click', () => toggleMicrophoneMute());
+if (toggleMicBtn) {
+  toggleMicBtn.addEventListener('click', () => toggleMicrophoneMute());
+}
 
 // Allow clicking the mic badge on the video card to mute as well!
 if (localMicBadge) {
@@ -1140,6 +1410,13 @@ const camBtnIcon = document.getElementById('camBtnIcon');
 const camBtnLabel = document.getElementById('camBtnLabel');
 
 function toggleCamera() {
+  // If currently using simulated fallback stream or no physical camera, clicking turns on real camera
+  if (isUsingSimulatedStream || !localStream || localStream.getVideoTracks().length === 0) {
+    addLog('Requesting physical webcam access...', 'signal');
+    initMedia(false, true);
+    return;
+  }
+
   isVideoMuted = !isVideoMuted;
 
   if (localStream) {
@@ -1162,7 +1439,7 @@ function toggleCamera() {
   if (camBtnLabel) camBtnLabel.textContent = isVideoMuted ? 'Start Video' : 'Stop Video';
 
   if (localCamBadge) {
-    localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Cam On';
+    localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Real Camera Active';
   }
 
   if (socket && socket.connected && currentCallId) {
@@ -1175,7 +1452,15 @@ function toggleCamera() {
   addLog(`Camera ${isVideoMuted ? 'Turned Off' : 'Turned On'}`, isVideoMuted ? 'warning' : 'success');
 }
 
-toggleCamBtn.addEventListener('click', toggleCamera);
+if (toggleCamBtn) {
+  toggleCamBtn.addEventListener('click', toggleCamera);
+}
+
+if (localCamBadge) {
+  localCamBadge.style.cursor = 'pointer';
+  localCamBadge.title = 'Click to activate or toggle camera';
+  localCamBadge.addEventListener('click', toggleCamera);
+}
 
 // -------------------------------------------------------------
 // Fullscreen Control Handlers
@@ -1227,8 +1512,14 @@ document.addEventListener('fullscreenchange', () => {
   }
 });
 
-toggleInterruptionBtn.addEventListener('click', toggleExternalInterruption);
-clearLogsBtn.addEventListener('click', () => { debugLogs.innerHTML = ''; });
+if (toggleInterruptionBtn) {
+  toggleInterruptionBtn.addEventListener('click', toggleExternalInterruption);
+}
+if (clearLogsBtn) {
+  clearLogsBtn.addEventListener('click', () => {
+    if (debugLogs) debugLogs.innerHTML = '';
+  });
+}
 
 // Network Status UI
 const networkStatusDot = document.getElementById('networkStatusDot');
@@ -1263,15 +1554,15 @@ function unlockAudioContext() {
 window.addEventListener('click', unlockAudioContext);
 window.addEventListener('touchstart', unlockAudioContext);
 
-// Init on Load
-window.addEventListener('DOMContentLoaded', () => {
-  myDisplayId.textContent = myUniqueId;
-  localUserTag.textContent = `Your ID: #${myUniqueId}`;
+// Robust App Initializer
+function initApp() {
+  if (myDisplayId) myDisplayId.textContent = myUniqueId;
+  if (localUserTag) localUserTag.textContent = `Your ID: #${myUniqueId}`;
 
   // Check URL params for direct call (e.g. ?call=849210)
   const urlParams = new URLSearchParams(window.location.search);
   const callParam = urlParams.get('call');
-  if (callParam) {
+  if (callParam && targetIdInput) {
     targetIdInput.value = callParam;
     addLog(`Auto-filled caller ID #${callParam} from invite link! Click Video or Audio Call to connect.`, 'success');
   }
@@ -1292,4 +1583,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   connectSocket();
   initMedia(false);
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}

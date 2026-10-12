@@ -37,6 +37,8 @@
         <button id="shareLinkBtn" class="btn-copy" style="background: linear-gradient(135deg, #059669, #10b981);" title="Share Direct Call Link">
           <span>🔗</span> Share Link
         </button>
+        <button id="editIdBtn" class="btn-ghost-sm" title="Change or set your custom permanent ID">✏️ Set My ID</button>
+      </div>
     </header>
 
     <!-- Real-time Status Notice -->
@@ -174,6 +176,19 @@
                 <span class="interruption-icon">⏸️</span>
                 <p>Call Paused / On Hold</p>
                 <small>Session active • Zero-Busy guarantee</small>
+              </div>
+            </div>
+
+            <!-- Camera Permission & Enable Prompt Overlay -->
+            <div class="camera-prompt-overlay" id="cameraPromptOverlay" style="display: none;">
+              <div class="camera-prompt-card">
+                <span class="prompt-icon">📷</span>
+                <b id="cameraPromptTitle">Camera Not Active</b>
+                <p id="cameraPromptDesc">Click below to allow browser access to your physical webcam:</p>
+                <div class="camera-prompt-actions">
+                  <button id="turnOnCameraBtn" class="btn-turn-on-cam">📷 Turn On Real Camera</button>
+                  <button id="dismissCameraPromptBtn" class="btn-dismiss-cam">Dismiss</button>
+                </div>
               </div>
             </div>
           </div>
@@ -317,6 +332,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

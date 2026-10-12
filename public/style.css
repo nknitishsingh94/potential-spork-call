@@ -730,6 +730,96 @@ body {
   color: #cbd5e1;
 }
 
+/* Camera Permission & Enable Prompt Overlay */
+.camera-prompt-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 10;
+  border-radius: var(--radius-lg);
+}
+
+.camera-prompt-card {
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  max-width: 320px;
+}
+
+.prompt-icon {
+  font-size: 2.2rem;
+}
+
+.camera-prompt-card b {
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.camera-prompt-card p {
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.camera-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-turn-on-cam {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: white;
+  border: none;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-full);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+.btn-turn-on-cam:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.45);
+}
+
+.btn-dismiss-cam {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-dismiss-cam:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
 /* Empty Placeholder (Light Card) */
 .empty-video-placeholder {
   text-align: center;

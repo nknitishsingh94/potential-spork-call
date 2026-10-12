@@ -419,7 +419,12 @@ io.on('connection', (socket) => {
         connectedUsers.delete(userId);
         broadcastOnlineUsers();
       } else {
-        console.log(`[Socket Cleanup] ID #${userId} still has active sockets in room.`);
+        const activeSockets = Array.from(room);
+        if (activeSockets.length > 0) {
+          user.socketId = activeSockets[0];
+          socketToUserId.set(user.socketId, userId);
+        }
+        console.log(`[Socket Cleanup] ID #${userId} still has active sockets in room. New socket: ${user.socketId}`);
       }
     }
   });
