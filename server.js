@@ -45,6 +45,9 @@ io.on('connection', (socket) => {
     const normId = normalizeId(uniqueId);
     const existing = connectedUsers.get(normId) || {};
 
+    // Join room for this normalized unique ID
+    socket.join(normId);
+
     connectedUsers.set(normId, {
       socketId: socket.id,
       uniqueId: normId,
@@ -54,7 +57,7 @@ io.on('connection', (socket) => {
     });
     socketToUserId.set(socket.id, normId);
 
-    console.log(`[User Registered] Unique ID: ${uniqueId} (Normalized: ${normId}) on socket ${socket.id}`);
+    console.log(`[User Registered] Unique ID: #${uniqueId} (Normalized: ${normId}) on socket ${socket.id}`);
 
     // Confirm registration to caller
     socket.emit('registered-success', {
@@ -92,17 +95,18 @@ io.on('connection', (socket) => {
 
     // Rule 1 & 5: Check whether receiver is online and reachable
     if (!receiver || !receiver.socketId) {
-      console.log(`[Call Attempt] Target ID "${targetId}" not found or offline -> UNAVAILABLE`);
+      const onlineList = Array.from(connectedUsers.values()).map(u => u.displayId).join(', ') || 'none';
+      console.log(`[Call Attempt] Target ID "${targetId}" (norm: ${normTargetId}) not found -> UNAVAILABLE. Online: [${onlineList}]`);
       socket.emit('call-failed', {
         targetId,
         reason: 'UNAVAILABLE',
-        message: `ID "${targetId}" is offline or does not exist.`
+        message: `ID "${targetId}" is offline or has not opened the app yet. Currently online IDs: ${onlineList}`
       });
       return;
     }
 
     if (callerId === normTargetId) {
-      socket.emit('call-error', { message: 'Cannot call your own ID' });
+      socket.emit('call-error', { message: 'You cannot call your own ID! Enter the ID of another user.' });
       return;
     }
 
@@ -133,14 +137,20 @@ io.on('connection', (socket) => {
       receiverHasExistingCall: isReceiverAlreadyInCall
     });
 
-    // Send incoming-call notification to receiver (Call Waiting HUD)
-    io.to(receiver.socketId).emit('incoming-call', {
+    // Send incoming-call notification to receiver room AND socket (Call Waiting HUD)
+    const incomingPayload = {
       callId,
       callerId: caller.displayId,
+      callerNormId: callerId,
       callType,
       isCallWaiting: isReceiverAlreadyInCall,
       currentCallId: receiver.activeCallId
-    });
+    };
+
+    io.to(normTargetId).emit('incoming-call', incomingPayload);
+    if (receiver.socketId && receiver.socketId !== socket.id) {
+      io.to(receiver.socketId).emit('incoming-call', incomingPayload);
+    }
 
     // Rule 5: 35-second timeout for UNAVAILABLE
     const timeoutHandle = setTimeout(() => {
@@ -151,15 +161,23 @@ io.on('connection', (socket) => {
         pendingCallTimeouts.delete(callId);
 
         // Notify caller
-        io.to(caller.socketId).emit('call-failed', {
+        io.to(callerId).emit('call-failed', {
           callId,
           targetId: receiver.displayId,
           reason: 'UNAVAILABLE',
           message: 'No response. Call timed out (UNAVAILABLE).'
         });
+        if (caller.socketId) {
+          io.to(caller.socketId).emit('call-failed', {
+            callId,
+            targetId: receiver.displayId,
+            reason: 'UNAVAILABLE',
+            message: 'No response. Call timed out (UNAVAILABLE).'
+          });
+        }
 
         // Notify receiver to dismiss dialog
-        io.to(receiver.socketId).emit('call-missed', {
+        io.to(normTargetId).emit('call-missed', {
           callId,
           callerId: caller.displayId
         });
@@ -271,6 +289,14 @@ io.on('connection', (socket) => {
         participants: participantList
       });
     }
+    io.to(callerId).emit('call-accepted', {
+      callId,
+      peerId: receiverId,
+      peerDisplayId: receiver.displayId,
+      callType: pendingCall.callType,
+      mode: 'direct',
+      participants: participantList
+    });
 
     socket.emit('call-connected', {
       callId,
@@ -294,26 +320,28 @@ io.on('connection', (socket) => {
 
     console.log(`[Call Rejected] Call ${callId} declined by receiver`);
 
+    const rejectPayload = {
+      callId,
+      reason: 'DECLINED',
+      message: 'Receiver declined the call'
+    };
+
     if (caller?.socketId) {
-      io.to(caller.socketId).emit('call-rejected', {
-        callId,
-        reason: 'DECLINED',
-        message: 'Receiver declined the call'
-      });
+      io.to(caller.socketId).emit('call-rejected', rejectPayload);
     }
+    io.to(call.initiatorId).emit('call-rejected', rejectPayload);
   });
 
-  // 6. WebRTC Signaling Relays
+  // 6. WebRTC Signaling Relays (Route to both Room and SocketId)
   socket.on('webrtc-offer', ({ targetUserId, offer, callId }) => {
     const fromUserId = socketToUserId.get(socket.id);
     const normTarget = normalizeId(targetUserId);
     const target = connectedUsers.get(normTarget);
+
+    const payload = { fromUserId, offer, callId };
+    io.to(normTarget).emit('webrtc-offer', payload);
     if (target?.socketId) {
-      io.to(target.socketId).emit('webrtc-offer', {
-        fromUserId,
-        offer,
-        callId
-      });
+      io.to(target.socketId).emit('webrtc-offer', payload);
     }
   });
 
@@ -321,12 +349,11 @@ io.on('connection', (socket) => {
     const fromUserId = socketToUserId.get(socket.id);
     const normTarget = normalizeId(targetUserId);
     const target = connectedUsers.get(normTarget);
+
+    const payload = { fromUserId, answer, callId };
+    io.to(normTarget).emit('webrtc-answer', payload);
     if (target?.socketId) {
-      io.to(target.socketId).emit('webrtc-answer', {
-        fromUserId,
-        answer,
-        callId
-      });
+      io.to(target.socketId).emit('webrtc-answer', payload);
     }
   });
 
@@ -334,12 +361,11 @@ io.on('connection', (socket) => {
     const fromUserId = socketToUserId.get(socket.id);
     const normTarget = normalizeId(targetUserId);
     const target = connectedUsers.get(normTarget);
+
+    const payload = { fromUserId, candidate, callId };
+    io.to(normTarget).emit('ice-candidate', payload);
     if (target?.socketId) {
-      io.to(target.socketId).emit('ice-candidate', {
-        fromUserId,
-        candidate,
-        callId
-      });
+      io.to(target.socketId).emit('ice-candidate', payload);
     }
   });
 
@@ -354,13 +380,15 @@ io.on('connection', (socket) => {
       call.participants.forEach(pid => {
         if (pid !== fromUserId) {
           const peer = connectedUsers.get(pid);
+          const payload = {
+            userId: fromUserId,
+            displayId: user.displayId,
+            isAudioMuted,
+            isVideoMuted
+          };
+          io.to(pid).emit('peer-media-state-updated', payload);
           if (peer?.socketId) {
-            io.to(peer.socketId).emit('peer-media-state-updated', {
-              userId: fromUserId,
-              displayId: user.displayId,
-              isAudioMuted,
-              isVideoMuted
-            });
+            io.to(peer.socketId).emit('peer-media-state-updated', payload);
           }
         }
       });
@@ -382,14 +410,16 @@ io.on('connection', (socket) => {
         call.participants.forEach(pid => {
           if (pid !== userId) {
             const peer = connectedUsers.get(pid);
+            const payload = {
+              callId: user.activeCallId,
+              userId,
+              displayId: user.displayId,
+              isHeld: isInterrupted,
+              reason: reason || 'External app has audio focus'
+            };
+            io.to(pid).emit('peer-hold-state', payload);
             if (peer?.socketId) {
-              io.to(peer.socketId).emit('peer-hold-state', {
-                callId: user.activeCallId,
-                userId,
-                displayId: user.displayId,
-                isHeld: isInterrupted,
-                reason: reason || 'WhatsApp call has audio focus'
-              });
+              io.to(peer.socketId).emit('peer-hold-state', payload);
             }
           }
         });
@@ -404,21 +434,30 @@ io.on('connection', (socket) => {
     endCallSession(callId, socketToUserId.get(socket.id));
   });
 
-  // 9. Disconnect
-  socket.on('disconnect', () => {
+  // 9. Disconnect with Graceful Reconnection Support
+  socket.on('disconnect', (reason) => {
     const userId = socketToUserId.get(socket.id);
+    socketToUserId.delete(socket.id);
     if (!userId) return;
 
+    console.log(`[Socket Disconnected] Socket ${socket.id} for ID #${userId}. Reason: ${reason}`);
+
     const user = connectedUsers.get(userId);
-    console.log(`[Socket Disconnected] ID #${user?.displayId || userId}`);
-
-    if (user?.activeCallId) {
-      endCallSession(user.activeCallId, userId);
+    // Only mark user offline if this was their active registered socket
+    if (user && user.socketId === socket.id) {
+      // Check if another socket for this user is still connected in room
+      const room = io.sockets.adapter.rooms.get(userId);
+      if (!room || room.size === 0) {
+        console.log(`[User Offline] ID #${user.displayId || userId} has left.`);
+        if (user.activeCallId) {
+          endCallSession(user.activeCallId, userId);
+        }
+        connectedUsers.delete(userId);
+        broadcastOnlineUsers();
+      } else {
+        console.log(`[Socket Cleanup] ID #${userId} still has active sockets in room.`);
+      }
     }
-
-    connectedUsers.delete(userId);
-    socketToUserId.delete(socket.id);
-    broadcastOnlineUsers();
   });
 });
 
@@ -449,6 +488,10 @@ function endCallSession(callId, endedByUserId) {
         });
       }
     }
+    io.to(pid).emit('call-ended', {
+      callId,
+      endedBy: endedByUserId
+    });
   });
 
   activeCalls.delete(callId);

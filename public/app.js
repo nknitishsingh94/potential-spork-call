@@ -1,11 +1,3 @@
-/**
- * Unique ID Calling System (No-Busy Architecture)
- * - Automatic 6-digit Unique Caller ID (e.g. 842-195)
- * - Direct Dialing: Video Call (📹) & Audio Call (🎙️)
- * - Zero USER_BUSY responses (Always RINGING if online)
- * - Call Waiting & Group Merge
- * - WhatsApp & Audio Focus Interruption Handling
- */
 
 // Generate random 6-digit Unique ID (e.g. "842-195")
 function generateUniqueId() {
@@ -38,11 +30,20 @@ let pendingIncomingCall = null;
 let callDurationTimer = null;
 let callStartTime = null;
 
-// Standard STUN servers
+// STUN & TURN servers for carrier-grade NAT traversal (e.g. Jio, Airtel, Vodafone 4G/5G)
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun1.l.google.com:19302' },
+    {
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
+      username: 'openrelay',
+      credential: 'openrelay'
+    }
   ]
 };
 
@@ -242,13 +243,33 @@ function createSimulatedCanvasStream(idLabel) {
 function connectSocket() {
   if (socket) return;
 
-  socket = io();
+  socket = io({
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 4000,
+    transports: ['websocket', 'polling']
+  });
 
   socket.on('connect', () => {
+    updateNetworkStatus(true);
     addLog(`Connected to Signaling Server [Socket: ${socket.id}]`, 'signal');
-    // Register unique ID
+    // Register unique ID immediately
     socket.emit('register-user', { uniqueId: myUniqueId });
   });
+
+  socket.on('disconnect', (reason) => {
+    updateNetworkStatus(false, 'Disconnected');
+    addLog(`Disconnected from server: ${reason}. Reconnecting automatically...`, 'warning');
+  });
+
+  if (socket.io) {
+    socket.io.on('reconnect', (attempt) => {
+      updateNetworkStatus(true);
+      addLog(`Reconnected to server (Attempt ${attempt}). Re-registering ID #${myUniqueId}...`, 'success');
+      socket.emit('register-user', { uniqueId: myUniqueId });
+    });
+  }
 
   socket.on('registered-success', (data) => {
     myDisplayId.textContent = data.displayId;
@@ -1209,6 +1230,39 @@ document.addEventListener('fullscreenchange', () => {
 toggleInterruptionBtn.addEventListener('click', toggleExternalInterruption);
 clearLogsBtn.addEventListener('click', () => { debugLogs.innerHTML = ''; });
 
+// Network Status UI
+const networkStatusDot = document.getElementById('networkStatusDot');
+const networkStatusText = document.getElementById('networkStatusText');
+const environmentHint = document.getElementById('environmentHint');
+
+function updateNetworkStatus(isConnected, message = '') {
+  if (networkStatusDot) {
+    networkStatusDot.style.background = isConnected ? '#22c55e' : '#ef4444';
+  }
+  if (networkStatusText) {
+    networkStatusText.innerHTML = isConnected 
+      ? `<b>Server Connected:</b> Ready for real-time video & audio calls`
+      : `<b>Server Disconnected:</b> ${message || 'Reconnecting...'}`;
+  }
+}
+
+// AudioContext Unlocker for Mobile Browsers (Autoplay Policy)
+function unlockAudioContext() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      if (!ringtoneAudioContext) {
+        ringtoneAudioContext = new AudioCtx();
+      }
+      if (ringtoneAudioContext.state === 'suspended') {
+        ringtoneAudioContext.resume();
+      }
+    }
+  } catch (e) {}
+}
+window.addEventListener('click', unlockAudioContext);
+window.addEventListener('touchstart', unlockAudioContext);
+
 // Init on Load
 window.addEventListener('DOMContentLoaded', () => {
   myDisplayId.textContent = myUniqueId;
@@ -1219,6 +1273,21 @@ window.addEventListener('DOMContentLoaded', () => {
   const callParam = urlParams.get('call');
   if (callParam) {
     targetIdInput.value = callParam;
+    addLog(`Auto-filled caller ID #${callParam} from invite link! Click Video or Audio Call to connect.`, 'success');
+  }
+
+  // Check environment (localhost vs live deployment)
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    if (environmentHint) {
+      environmentHint.innerHTML = '⚠️ <b>Testing on Localhost:</b> To call another phone, open your live Render link on both devices!';
+      environmentHint.style.color = '#b45309';
+    }
+    addLog('Running on localhost. To call another phone or user, ensure both devices are on your live hosted URL.', 'warning');
+  } else {
+    if (environmentHint) {
+      environmentHint.innerHTML = '🌐 <b>Live Hosted Server:</b> Ready for real-time calling';
+      environmentHint.style.color = '#15803d';
+    }
   }
 
   connectSocket();
