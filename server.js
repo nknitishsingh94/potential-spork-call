@@ -137,7 +137,7 @@ io.on('connection', (socket) => {
       receiverHasExistingCall: isReceiverAlreadyInCall
     });
 
-    // Send incoming-call notification to receiver room AND socket (Call Waiting HUD)
+    // Send incoming-call notification to receiver room (Call Waiting HUD)
     const incomingPayload = {
       callId,
       callerId: caller.displayId,
@@ -148,9 +148,6 @@ io.on('connection', (socket) => {
     };
 
     io.to(normTargetId).emit('incoming-call', incomingPayload);
-    if (receiver.socketId && receiver.socketId !== socket.id) {
-      io.to(receiver.socketId).emit('incoming-call', incomingPayload);
-    }
 
     // Rule 5: 35-second timeout for UNAVAILABLE
     const timeoutHandle = setTimeout(() => {
@@ -279,16 +276,6 @@ io.on('connection', (socket) => {
       { userId: receiverId, displayId: receiver.displayId }
     ];
 
-    if (caller?.socketId) {
-      io.to(caller.socketId).emit('call-accepted', {
-        callId,
-        peerId: receiverId,
-        peerDisplayId: receiver.displayId,
-        callType: pendingCall.callType,
-        mode: 'direct',
-        participants: participantList
-      });
-    }
     io.to(callerId).emit('call-accepted', {
       callId,
       peerId: receiverId,
@@ -315,9 +302,7 @@ io.on('connection', (socket) => {
     const call = activeCalls.get(callId);
     if (!call) return;
 
-    const caller = connectedUsers.get(call.initiatorId);
     activeCalls.delete(callId);
-
     console.log(`[Call Rejected] Call ${callId} declined by receiver`);
 
     const rejectPayload = {
@@ -326,47 +311,26 @@ io.on('connection', (socket) => {
       message: 'Receiver declined the call'
     };
 
-    if (caller?.socketId) {
-      io.to(caller.socketId).emit('call-rejected', rejectPayload);
-    }
     io.to(call.initiatorId).emit('call-rejected', rejectPayload);
   });
 
-  // 6. WebRTC Signaling Relays (Route to both Room and SocketId)
+  // 6. WebRTC Signaling Relays (Route cleanly to Room)
   socket.on('webrtc-offer', ({ targetUserId, offer, callId }) => {
     const fromUserId = socketToUserId.get(socket.id);
     const normTarget = normalizeId(targetUserId);
-    const target = connectedUsers.get(normTarget);
-
-    const payload = { fromUserId, offer, callId };
-    io.to(normTarget).emit('webrtc-offer', payload);
-    if (target?.socketId) {
-      io.to(target.socketId).emit('webrtc-offer', payload);
-    }
+    io.to(normTarget).emit('webrtc-offer', { fromUserId, offer, callId });
   });
 
   socket.on('webrtc-answer', ({ targetUserId, answer, callId }) => {
     const fromUserId = socketToUserId.get(socket.id);
     const normTarget = normalizeId(targetUserId);
-    const target = connectedUsers.get(normTarget);
-
-    const payload = { fromUserId, answer, callId };
-    io.to(normTarget).emit('webrtc-answer', payload);
-    if (target?.socketId) {
-      io.to(target.socketId).emit('webrtc-answer', payload);
-    }
+    io.to(normTarget).emit('webrtc-answer', { fromUserId, answer, callId });
   });
 
   socket.on('ice-candidate', ({ targetUserId, candidate, callId }) => {
     const fromUserId = socketToUserId.get(socket.id);
     const normTarget = normalizeId(targetUserId);
-    const target = connectedUsers.get(normTarget);
-
-    const payload = { fromUserId, candidate, callId };
-    io.to(normTarget).emit('ice-candidate', payload);
-    if (target?.socketId) {
-      io.to(target.socketId).emit('ice-candidate', payload);
-    }
+    io.to(normTarget).emit('ice-candidate', { fromUserId, candidate, callId });
   });
 
   // Relay Mute / Camera state to call participants
