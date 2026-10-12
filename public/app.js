@@ -799,29 +799,95 @@ declineCallBtn.addEventListener('click', declineIncomingCall);
 // Floating Call Controls
 endCallBtn.addEventListener('click', () => endCurrentCallLocal(true));
 
+// Enhanced Mute / Unmute Microphone
+const micBtnIcon = document.getElementById('micBtnIcon');
+const micBtnLabel = document.getElementById('micBtnLabel');
+
 toggleMicBtn.addEventListener('click', () => {
   if (localStream) {
-    const audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length > 0) {
       isAudioMuted = !isAudioMuted;
-      audioTrack.enabled = !isAudioMuted;
-      toggleMicBtn.classList.toggle('muted', isAudioMuted);
-      toggleMicBtn.querySelector('.icon').textContent = isAudioMuted ? '🔇' : '🎤';
-      localMicBadge.textContent = isAudioMuted ? '🎙️ Muted' : '🎙️ Active';
+      audioTracks.forEach(t => (t.enabled = !isAudioMuted));
+      
+      toggleMicBtn.classList.toggle('is-muted', isAudioMuted);
+      if (micBtnIcon) micBtnIcon.textContent = isAudioMuted ? '🔇' : '🎤';
+      if (micBtnLabel) micBtnLabel.textContent = isAudioMuted ? 'Unmute' : 'Mute';
+      
+      localMicBadge.textContent = isAudioMuted ? '🔇 Muted' : '🎙️ Mic On';
+      localMicBadge.classList.toggle('muted-badge', isAudioMuted);
+      
+      addLog(`Microphone ${isAudioMuted ? 'MUTED' : 'UNMUTED'}`, isAudioMuted ? 'warning' : 'success');
     }
   }
 });
 
+// Camera Toggle
+const camBtnIcon = document.getElementById('camBtnIcon');
+const camBtnLabel = document.getElementById('camBtnLabel');
+
 toggleCamBtn.addEventListener('click', () => {
   if (localStream) {
-    const videoTrack = localStream.getVideoTracks()[0];
-    if (videoTrack) {
+    const videoTracks = localStream.getVideoTracks();
+    if (videoTracks.length > 0) {
       isVideoMuted = !isVideoMuted;
-      videoTrack.enabled = !isVideoMuted;
-      toggleCamBtn.classList.toggle('muted', isVideoMuted);
-      toggleCamBtn.querySelector('.icon').textContent = isVideoMuted ? '🚫' : '📹';
-      localCamBadge.textContent = isVideoMuted ? '📹 Off' : '📹 Active';
+      videoTracks.forEach(t => (t.enabled = !isVideoMuted));
+      
+      toggleCamBtn.classList.toggle('is-muted', isVideoMuted);
+      if (camBtnIcon) camBtnIcon.textContent = isVideoMuted ? '🚫' : '📹';
+      if (camBtnLabel) camBtnLabel.textContent = isVideoMuted ? 'Start Video' : 'Stop Video';
+      
+      localCamBadge.textContent = isVideoMuted ? '📹 Cam Off' : '📹 Cam On';
+      addLog(`Camera ${isVideoMuted ? 'Turned Off' : 'Turned On'}`, isVideoMuted ? 'warning' : 'success');
     }
+  }
+});
+
+// Fullscreen Control Handlers
+const videoStageArea = document.getElementById('videoStageArea');
+const headerFullscreenBtn = document.getElementById('headerFullscreenBtn');
+const headerFullscreenIcon = document.getElementById('headerFullscreenIcon');
+const toggleFullscreenBtn = document.getElementById('toggleFullscreenBtn');
+const fullscreenBtnIcon = document.getElementById('fullscreenBtnIcon');
+
+function toggleFullscreenMode() {
+  const stage = videoStageArea || document.documentElement;
+  
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    if (stage.requestFullscreen) {
+      stage.requestFullscreen();
+    } else if (stage.webkitRequestFullscreen) {
+      stage.webkitRequestFullscreen();
+    }
+    stage.classList.add('is-fullscreen');
+    if (headerFullscreenIcon) headerFullscreenIcon.textContent = '✕';
+    if (fullscreenBtnIcon) fullscreenBtnIcon.textContent = '✕';
+    addLog('Entered Full Screen view', 'info');
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+    stage.classList.remove('is-fullscreen');
+    if (headerFullscreenIcon) headerFullscreenIcon.textContent = '⛶';
+    if (fullscreenBtnIcon) fullscreenBtnIcon.textContent = '⛶';
+    addLog('Exited Full Screen view', 'info');
+  }
+}
+
+if (headerFullscreenBtn) {
+  headerFullscreenBtn.addEventListener('click', toggleFullscreenMode);
+}
+if (toggleFullscreenBtn) {
+  toggleFullscreenBtn.addEventListener('click', toggleFullscreenMode);
+}
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    if (videoStageArea) videoStageArea.classList.remove('is-fullscreen');
+    if (headerFullscreenIcon) headerFullscreenIcon.textContent = '⛶';
+    if (fullscreenBtnIcon) fullscreenBtnIcon.textContent = '⛶';
   }
 });
 

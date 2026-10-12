@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>No-Busy Calling Console | Unique ID & Audio/Video WebRTC</title>
+  <title>Non-Stop Calling Console | Clean Light Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="light-theme">
   <div class="app-shell">
-    <!-- Header with Unique ID Badge -->
+    <!-- Top Header (Clean White Design) -->
     <header class="app-header">
       <div class="brand">
         <div class="brand-icon">
@@ -32,15 +32,15 @@
           <span class="id-digits" id="myDisplayId">--- ---</span>
         </div>
         <button id="copyIdBtn" class="btn-copy" title="Copy your ID">
-          <span>📋</span> Copy
+          <span>📋</span> Copy ID
         </button>
-        <button id="newIdBtn" class="btn-ghost-sm" title="Generate new ID">🔄 New</button>
+        <button id="newIdBtn" class="btn-ghost-sm" title="Generate fresh ID">🔄 New</button>
       </div>
     </header>
 
-    <!-- Main Content Grid -->
+    <!-- Main Workspace -->
     <main class="main-content">
-      <!-- Left: Dial Pad & Contacts -->
+      <!-- Left Sidebar: Dial Pad & Contacts -->
       <aside class="sidebar">
         <!-- Direct Dial Card -->
         <div class="sidebar-card dial-card">
@@ -69,7 +69,7 @@
               <span class="btn-icon">📹</span>
               <div class="dial-btn-text">
                 <b>Video Call</b>
-                <small>Camera & Mic</small>
+                <small>Camera & Voice</small>
               </div>
             </button>
 
@@ -83,14 +83,14 @@
           </div>
         </div>
 
-        <!-- WhatsApp / System Interruption Card -->
+        <!-- WhatsApp Interruption Test -->
         <div class="sidebar-card highlight-card">
           <div class="card-header">
             <h3>📲 WhatsApp Interruption Test</h3>
             <span class="badge badge-warning">OS Simulation</span>
           </div>
           <p class="card-desc">
-            Simulate what happens when <b>WhatsApp</b> takes your mic. The app stays online and callers get <b>RINGING</b> (never Busy!).
+            Simulate what happens when <b>WhatsApp</b> takes audio focus. The call stays connected and callers get <b>RINGING</b> (never Busy!).
           </p>
           <div class="interruption-controls">
             <button id="toggleInterruptionBtn" class="btn-warning">
@@ -98,16 +98,16 @@
               <span id="interruptionBtnText">Simulate WhatsApp Call (Hold Mic)</span>
             </button>
             <div class="interruption-state-banner" id="interruptionStateBanner" style="display: none;">
-              ⚠️ Mic is temporarily held by WhatsApp. Callers still see RINGING!
+              ⚠️ Mic held by WhatsApp. Callers still get RINGING!
             </div>
           </div>
         </div>
 
-        <!-- Online Directory by Unique ID -->
+        <!-- Active Online IDs -->
         <div class="sidebar-card">
           <div class="card-header">
             <h3>👥 Active Online IDs</h3>
-            <span class="badge" id="onlineCountBadge">0 Online</span>
+            <span class="badge badge-gray" id="onlineCountBadge">0 Online</span>
           </div>
           <p class="card-desc">
             Click any active ID to auto-fill and call directly:
@@ -118,18 +118,23 @@
         </div>
       </aside>
 
-      <!-- Center: Video/Audio Stage -->
-      <section class="video-stage">
+      <!-- Center & Right: Video Stage -->
+      <section class="video-stage" id="videoStageArea">
         <!-- Call Status Bar -->
         <div class="call-status-bar" id="callStatusBar">
           <div class="status-indicator">
             <span class="pulse-dot"></span>
             <span id="callStatusMessage">Ready • Enter an ID or share your ID</span>
           </div>
-          <div class="call-type-indicator" id="callTypeIndicator" style="display: none;">
-            <span id="callTypeBadge">📹 VIDEO</span>
+          <div class="status-actions">
+            <div class="call-type-indicator" id="callTypeIndicator" style="display: none;">
+              <span id="callTypeBadge">📹 VIDEO</span>
+            </div>
+            <div class="call-timer" id="callTimer" style="display: none;">00:00</div>
+            <button id="headerFullscreenBtn" class="btn-icon-square" title="Full Screen">
+              <span id="headerFullscreenIcon">⛶</span>
+            </button>
           </div>
-          <div class="call-timer" id="callTimer" style="display: none;">00:00</div>
         </div>
 
         <!-- Active Video / Audio Grid -->
@@ -148,8 +153,8 @@
             <div class="video-overlay">
               <span class="user-tag" id="localUserTag">ID: Your Screen</span>
               <div class="stream-badges">
-                <span class="stream-badge" id="localMicBadge">🎙️ Active</span>
-                <span class="stream-badge" id="localCamBadge">📹 Active</span>
+                <span class="stream-badge" id="localMicBadge">🎙️ Mic On</span>
+                <span class="stream-badge" id="localCamBadge">📹 Cam On</span>
               </div>
             </div>
 
@@ -158,7 +163,7 @@
               <div class="interruption-content">
                 <span class="interruption-icon">📲</span>
                 <p>Microphone held by WhatsApp Call</p>
-                <small>WebRTC session alive • Zero Busy response guaranteed</small>
+                <small>Session alive • Zero Busy response guaranteed</small>
               </div>
             </div>
           </div>
@@ -173,23 +178,36 @@
                 <span class="pill">✔ 0% Busy Tone</span>
                 <span class="pill">✔ Instant Ringing</span>
                 <span class="pill">✔ Call Waiting</span>
-                <span class="pill">✔ Group Merge</span>
+                <span class="pill">✔ Fullscreen View</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- In-Call Floating Control Bar -->
+        <!-- In-Call Floating Control Bar (With Mute & Fullscreen) -->
         <div class="call-control-bar" id="callControlBar" style="display: none;">
-          <button id="toggleMicBtn" class="control-btn" title="Toggle Mic">
-            <span class="icon">🎤</span>
+          <!-- Mute/Unmute Mic Button -->
+          <button id="toggleMicBtn" class="control-btn" title="Mute / Unmute Microphone">
+            <span class="icon" id="micBtnIcon">🎤</span>
+            <span class="btn-label" id="micBtnLabel">Mute</span>
           </button>
-          <button id="toggleCamBtn" class="control-btn" title="Toggle Camera">
-            <span class="icon">📹</span>
+
+          <!-- Toggle Camera Button -->
+          <button id="toggleCamBtn" class="control-btn" title="Turn Camera Off / On">
+            <span class="icon" id="camBtnIcon">📹</span>
+            <span class="btn-label" id="camBtnLabel">Video</span>
           </button>
+
+          <!-- Fullscreen Button -->
+          <button id="toggleFullscreenBtn" class="control-btn" title="Full Screen Video">
+            <span class="icon" id="fullscreenBtnIcon">⛶</span>
+            <span class="btn-label">Full Screen</span>
+          </button>
+
+          <!-- End Call Button -->
           <button id="endCallBtn" class="control-btn btn-danger" title="End Call">
             <span class="icon">🛑</span>
-            <span class="label">End Call</span>
+            <span class="btn-label">End Call</span>
           </button>
         </div>
 
@@ -200,7 +218,7 @@
             <button id="clearLogsBtn" class="btn-xs">Clear</button>
           </div>
           <div class="debug-logs" id="debugLogs">
-            <div class="log-entry log-system">[INIT] System ready. Unique ID generated.</div>
+            <div class="log-entry log-system">[INIT] System ready in clean white theme.</div>
           </div>
         </div>
       </section>
@@ -240,7 +258,6 @@
           Incoming call request received. Caller is hearing a normal Ringing tone.
         </p>
 
-        <!-- Actions -->
         <div class="incoming-actions">
           <button id="acceptCallStandardBtn" class="btn-success btn-large">
             <span>📞</span> Answer Call
