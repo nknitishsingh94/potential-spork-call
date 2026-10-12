@@ -14,10 +14,13 @@ function generateUniqueId() {
   return `${n1}-${n2}`;
 }
 
-// State variables
+// State variables (PERMANENT ID via localStorage)
 let socket = null;
-let myUniqueId = sessionStorage.getItem('caller_unique_id') || generateUniqueId();
-sessionStorage.setItem('caller_unique_id', myUniqueId);
+let myUniqueId = localStorage.getItem('permanent_caller_id');
+if (!myUniqueId) {
+  myUniqueId = generateUniqueId();
+  localStorage.setItem('permanent_caller_id', myUniqueId);
+}
 
 let localStream = null;
 let activeCallType = 'video'; // 'video' | 'audio'
@@ -46,7 +49,7 @@ const rtcConfig = {
 // UI Elements
 const myDisplayId = document.getElementById('myDisplayId');
 const copyIdBtn = document.getElementById('copyIdBtn');
-const newIdBtn = document.getElementById('newIdBtn');
+const editIdBtn = document.getElementById('editIdBtn');
 const targetIdInput = document.getElementById('targetIdInput');
 const startVideoCallBtn = document.getElementById('startVideoCallBtn');
 const startAudioCallBtn = document.getElementById('startAudioCallBtn');
@@ -936,17 +939,30 @@ copyIdBtn.addEventListener('click', () => {
   });
 });
 
-// Generate New ID
-newIdBtn.addEventListener('click', () => {
-  myUniqueId = generateUniqueId();
-  sessionStorage.setItem('caller_unique_id', myUniqueId);
-  myDisplayId.textContent = myUniqueId;
-  localUserTag.textContent = `Your ID: #${myUniqueId}`;
-  if (socket && socket.connected) {
-    socket.emit('register-user', { uniqueId: myUniqueId });
-  }
-  addLog(`Generated fresh ID: #${myUniqueId}`, 'info');
-});
+// Edit / Customize Permanent Caller ID
+if (editIdBtn) {
+  editIdBtn.addEventListener('click', () => {
+    const custom = prompt('Enter your preferred permanent Caller ID (e.g. 583-912 or any 6 digits):', myUniqueId);
+    if (custom && custom.trim().length >= 3) {
+      let cleaned = custom.trim().replace(/[^0-9]/g, '');
+      let formatted = cleaned;
+      if (cleaned.length >= 6) {
+        formatted = `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}`;
+      } else {
+        formatted = custom.trim();
+      }
+      myUniqueId = formatted;
+      localStorage.setItem('permanent_caller_id', myUniqueId);
+      myDisplayId.textContent = myUniqueId;
+      localUserTag.textContent = `Your ID: #${myUniqueId}`;
+      if (socket && socket.connected) {
+        socket.emit('register-user', { uniqueId: myUniqueId });
+      }
+      addLog(`Permanent Caller ID saved as: #${myUniqueId}`, 'success');
+      alert(`Your permanent ID is saved as: ${myUniqueId}\nThis ID will now stay permanently saved on this device like a phone number!`);
+    }
+  });
+}
 
 // Outgoing / Incoming Call Modal handlers
 cancelOutgoingCallBtn.addEventListener('click', cancelOutgoingCall);
