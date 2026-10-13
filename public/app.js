@@ -115,6 +115,23 @@ const acceptAndMergeBtn = document.getElementById('acceptAndMergeBtn');
 const acceptAndHoldBtn = document.getElementById('acceptAndHoldBtn');
 const declineCallBtn = document.getElementById('declineCallBtn');
 
+// Live Dynamic Incoming Call Reception Card elements
+const sidebarIncomingCard = document.getElementById('sidebarIncomingCard');
+const sidebarIncomingStatusBadge = document.getElementById('sidebarIncomingStatusBadge');
+const sidebarIncomingIdleState = document.getElementById('sidebarIncomingIdleState');
+const sidebarIncomingActiveState = document.getElementById('sidebarIncomingActiveState');
+const sidebarIncomingInCallState = document.getElementById('sidebarIncomingInCallState');
+const sidebarIncomingMyIdBadge = document.getElementById('sidebarIncomingMyIdBadge');
+const sidebarIncomingCallerId = document.getElementById('sidebarIncomingCallerId');
+const sidebarIncomingCallType = document.getElementById('sidebarIncomingCallType');
+const sidebarAcceptCallBtn = document.getElementById('sidebarAcceptCallBtn');
+const sidebarDeclineCallBtn = document.getElementById('sidebarDeclineCallBtn');
+const sidebarCallWaitingActions = document.getElementById('sidebarCallWaitingActions');
+const sidebarMergeCallBtn = document.getElementById('sidebarMergeCallBtn');
+const sidebarHoldCallBtn = document.getElementById('sidebarHoldCallBtn');
+const sidebarInCallPeerName = document.getElementById('sidebarInCallPeerName');
+const sidebarInCallTimer = document.getElementById('sidebarInCallTimer');
+
 // WhatsApp Interruption controls
 const toggleInterruptionBtn = document.getElementById('toggleInterruptionBtn');
 const interruptionBtnText = document.getElementById('interruptionBtnText');
@@ -130,6 +147,7 @@ function updateAllIdDisplays(id) {
   if (myDisplayId) myDisplayId.textContent = id;
   if (sidebarCallerId) sidebarCallerId.textContent = id;
   if (localUserTag) localUserTag.textContent = `Your ID: #${id}`;
+  if (sidebarIncomingMyIdBadge) sidebarIncomingMyIdBadge.textContent = `#${id}`;
   if (callStatusMessage && (!currentCallId || currentCallPeers.size === 0)) {
     callStatusMessage.textContent = `Your Permanent ID: #${id} • Ready to make & receive calls`;
   }
@@ -1060,6 +1078,22 @@ if (toastDeclineBtn) {
   toastDeclineBtn.addEventListener('click', declineIncomingCall);
 }
 
+function resetSidebarIncomingCardIdle() {
+  if (sidebarIncomingCard) {
+    sidebarIncomingCard.classList.remove('is-ringing');
+    if (sidebarIncomingIdleState) sidebarIncomingIdleState.style.display = 'block';
+    if (sidebarIncomingActiveState) sidebarIncomingActiveState.style.display = 'none';
+    if (sidebarIncomingInCallState) sidebarIncomingInCallState.style.display = 'none';
+    if (sidebarIncomingStatusBadge) {
+      sidebarIncomingStatusBadge.textContent = '🟢 Ready';
+      sidebarIncomingStatusBadge.className = 'badge badge-success';
+    }
+    if (sidebarIncomingMyIdBadge) {
+      sidebarIncomingMyIdBadge.textContent = `#${myUniqueId}`;
+    }
+  }
+}
+
 function handleIncomingCallNotification(data) {
   pendingIncomingCall = data;
 
@@ -1070,6 +1104,27 @@ function handleIncomingCallNotification(data) {
   if (toastCallerTitle) toastCallerTitle.textContent = `ID #${data.callerId} is calling you!`;
   if (toastCallerType) toastCallerType.textContent = data.callType === 'video' ? '📹 Incoming Video Call' : '🎙️ Incoming Audio Call';
   if (incomingToastBanner) incomingToastBanner.style.display = 'flex';
+
+  // Dynamic Sidebar Live Reception Card
+  if (sidebarIncomingCard) {
+    sidebarIncomingCard.classList.add('is-ringing');
+    if (sidebarIncomingIdleState) sidebarIncomingIdleState.style.display = 'none';
+    if (sidebarIncomingInCallState) sidebarIncomingInCallState.style.display = 'none';
+    if (sidebarIncomingActiveState) sidebarIncomingActiveState.style.display = 'flex';
+    if (sidebarIncomingStatusBadge) {
+      sidebarIncomingStatusBadge.textContent = '🔔 RINGING!';
+      sidebarIncomingStatusBadge.className = 'badge badge-danger badge-pulse';
+    }
+    if (sidebarIncomingCallerId) {
+      sidebarIncomingCallerId.textContent = `ID #${data.callerId}`;
+    }
+    if (sidebarIncomingCallType) {
+      sidebarIncomingCallType.textContent = data.callType === 'video' ? '📹 Video Call' : '🎙️ Audio Call';
+    }
+    if (sidebarCallWaitingActions) {
+      sidebarCallWaitingActions.style.display = data.isCallWaiting ? 'grid' : 'none';
+    }
+  }
 
   if (data.isCallWaiting) {
     callWaitingNotice.style.display = 'block';
@@ -1130,6 +1185,10 @@ function closeIncomingModal() {
   incomingCallModal.style.display = 'none';
   if (incomingToastBanner) incomingToastBanner.style.display = 'none';
   pendingIncomingCall = null;
+
+  if (!currentCallId || currentCallPeers.size === 0) {
+    resetSidebarIncomingCardIdle();
+  }
 }
 
 // -------------------------------------------------------------
@@ -1141,6 +1200,17 @@ function startCallSessionUI(participants = [], callType = 'video') {
   callTypeIndicator.style.display = 'block';
   callTypeBadge.textContent = callType === 'video' ? '📹 VIDEO' : '🎙️ AUDIO';
   callStatusBar.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+
+  if (sidebarIncomingCard) {
+    sidebarIncomingCard.classList.remove('is-ringing');
+    if (sidebarIncomingIdleState) sidebarIncomingIdleState.style.display = 'none';
+    if (sidebarIncomingActiveState) sidebarIncomingActiveState.style.display = 'none';
+    if (sidebarIncomingInCallState) sidebarIncomingInCallState.style.display = 'block';
+    if (sidebarIncomingStatusBadge) {
+      sidebarIncomingStatusBadge.textContent = '📞 In Call';
+      sidebarIncomingStatusBadge.className = 'badge badge-accent';
+    }
+  }
 
   startTimer();
   renderCallParticipants(participants);
@@ -1160,6 +1230,9 @@ function renderCallParticipants(participants) {
   const ids = Array.from(currentCallPeers.values());
   if (ids.length > 0) {
     callStatusMessage.textContent = `Call Active with: #${ids.join(', #')}`;
+    if (sidebarInCallPeerName) {
+      sidebarInCallPeerName.textContent = `Connected with ID #${ids.join(', #')}`;
+    }
   }
 }
 
@@ -1170,7 +1243,11 @@ function startTimer() {
     const elapsed = Math.floor((Date.now() - callStartTime) / 1000);
     const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
     const secs = String(elapsed % 60).padStart(2, '0');
-    callTimer.textContent = `${mins}:${secs}`;
+    const timeStr = `${mins}:${secs}`;
+    callTimer.textContent = timeStr;
+    if (sidebarInCallTimer) {
+      sidebarInCallTimer.textContent = `Active • ${timeStr}`;
+    }
   }, 1000);
 }
 
@@ -1199,6 +1276,7 @@ function endCurrentCallLocal(emitToServer = true) {
   callStatusBar.style.borderColor = 'var(--border-light)';
   callStatusMessage.textContent = 'Ready • Enter an ID or share your ID';
   stopTimer();
+  resetSidebarIncomingCardIdle();
 
   addLog('Call session ended.', 'info');
 }
@@ -1388,6 +1466,12 @@ if (acceptCallStandardBtn) acceptCallStandardBtn.addEventListener('click', () =>
 if (acceptAndMergeBtn) acceptAndMergeBtn.addEventListener('click', () => acceptIncomingCall('merge'));
 if (acceptAndHoldBtn) acceptAndHoldBtn.addEventListener('click', () => acceptIncomingCall('standard'));
 if (declineCallBtn) declineCallBtn.addEventListener('click', declineIncomingCall);
+
+// Sidebar Live Incoming Call Card Handlers
+if (sidebarAcceptCallBtn) sidebarAcceptCallBtn.addEventListener('click', () => acceptIncomingCall('standard'));
+if (sidebarDeclineCallBtn) sidebarDeclineCallBtn.addEventListener('click', declineIncomingCall);
+if (sidebarMergeCallBtn) sidebarMergeCallBtn.addEventListener('click', () => acceptIncomingCall('merge'));
+if (sidebarHoldCallBtn) sidebarHoldCallBtn.addEventListener('click', () => acceptIncomingCall('standard'));
 
 // Floating Call Controls
 if (endCallBtn) endCallBtn.addEventListener('click', () => endCurrentCallLocal(true));

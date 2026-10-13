@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="stylesheet" href="style.css?v=11">
 </head>
 <body class="light-theme">
   <div class="app-shell">
@@ -139,6 +139,65 @@
           </p>
           <div class="user-list" id="usersList">
             <div class="empty-state">No other IDs connected yet...</div>
+          </div>
+        </div>
+
+        <!-- Dynamic Live Incoming Call Card (Real-Time Dynamic Reception) -->
+        <div class="sidebar-card live-incoming-card" id="sidebarIncomingCard">
+          <div class="card-header">
+            <h3>📥 Live Incoming Call</h3>
+            <span class="badge badge-success" id="sidebarIncomingStatusBadge">🟢 Ready</span>
+          </div>
+
+          <!-- State 1: Idle (Waiting for Calls) -->
+          <div id="sidebarIncomingIdleState" class="incoming-idle-state">
+            <div class="incoming-idle-icon">📡</div>
+            <p class="incoming-idle-title">Listening for Incoming Calls</p>
+            <p class="incoming-idle-desc">
+              When anyone calls your ID (<b id="sidebarIncomingMyIdBadge">#---</b>), their live incoming call and answer screen will appear right here dynamically!
+            </p>
+          </div>
+
+          <!-- State 2: Active Incoming Call (Ringing Right Now!) -->
+          <div id="sidebarIncomingActiveState" class="incoming-active-state" style="display: none;">
+            <div class="incoming-pulse-box">
+              <span class="incoming-ring-bell">🔔</span>
+              <div class="incoming-active-info">
+                <span class="incoming-badge-tag">INCOMING CALL RINGING...</span>
+                <h4 id="sidebarIncomingCallerId" class="incoming-active-caller">ID #---</h4>
+                <span id="sidebarIncomingCallType" class="incoming-active-type">📹 Video Call</span>
+              </div>
+            </div>
+
+            <div class="sidebar-incoming-actions">
+              <button id="sidebarAcceptCallBtn" class="btn-sidebar-answer" title="Answer Incoming Call">
+                <span class="btn-action-icon">📞</span> ANSWER
+              </button>
+              <button id="sidebarDeclineCallBtn" class="btn-sidebar-decline" title="Decline Incoming Call">
+                <span>❌</span> DECLINE
+              </button>
+            </div>
+
+            <!-- Call waiting extra options -->
+            <div id="sidebarCallWaitingActions" class="sidebar-call-waiting-grid" style="display: none;">
+              <button id="sidebarMergeCallBtn" class="btn-sidebar-merge">
+                <span>👥</span> Merge
+              </button>
+              <button id="sidebarHoldCallBtn" class="btn-sidebar-hold">
+                <span>🔀</span> Hold
+              </button>
+            </div>
+          </div>
+
+          <!-- State 3: Active Connected Call -->
+          <div id="sidebarIncomingInCallState" class="incoming-incall-state" style="display: none;">
+            <div class="incall-indicator">
+              <span class="incall-dot"></span>
+              <div>
+                <b id="sidebarInCallPeerName">Connected with ID #---</b>
+                <div id="sidebarInCallTimer" class="incall-timer">Active • 00:00</div>
+              </div>
+            </div>
           </div>
         </div>
       </aside>
@@ -345,6 +404,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
