@@ -3,335 +3,356 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Non-Stop Call | Zero-Busy WebRTC Video & Audio Calling Network</title>
-  <meta name="description" content="Instant 6-digit permanent phone numbers for HD video and audio calling. Guaranteed zero busy signals, peer-to-peer encrypted WebRTC, and no SIM card required.">
+  <title>MeetFlow | Seamless HD Video Meetings & Calls</title>
+  <meta name="description" content="Instant browser-based HD video meetings and crystal-clear audio calls. Zero app downloads, 1-click room links, and guaranteed zero busy signals.">
+  
+  <!-- Perfection Typography: Outfit (Headlines) & Plus Jakarta Sans / Inter (Body & UI) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="landing.css?v=2">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="landing.css?v=5">
 </head>
 <body>
 
-  <!-- Navigation Bar -->
-  <header class="site-header">
-    <div class="container nav-wrap">
-      <a href="/" class="brand-link" id="brandLogoLink">
-        <div class="brand-icon-box">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+  <!-- Ambient background glow -->
+  <div class="ambient-glow-top"></div>
+
+  <!-- Navigation Bar (Clean White Glass) -->
+  <header class="site-nav">
+    <div class="container nav-inner">
+      <a href="/" class="brand-wrap" id="mainBrandLink">
+        <div class="brand-mark">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 10l5-5v14l-5-5"></path>
+            <rect x="2" y="6" width="13" height="12" rx="3"></rect>
           </svg>
         </div>
-        <div class="brand-name">NonStop<span>Call</span></div>
+        <div class="brand-name">Meet<span>Flow</span></div>
       </a>
 
       <nav>
-        <ul class="nav-links">
+        <ul class="nav-menu">
           <li><a href="#features">Features</a></li>
-          <li><a href="#zerobusy">Zero-Busy Engine</a></li>
+          <li><a href="#architecture">Architecture</a></li>
           <li><a href="#howitworks">How It Works</a></li>
           <li><a href="#faq">FAQ</a></li>
         </ul>
       </nav>
 
-      <!-- Nav Actions (Logged Out vs Logged In) -->
-      <div class="nav-actions" id="navAuthActions">
-        <button id="btnOpenSignIn" class="btn btn-ghost">Sign In</button>
-        <button id="btnOpenSignUp" class="btn btn-primary">Claim Free ID</button>
-        <a href="/app" class="btn btn-outline" title="Open Console Directly">Open Console ➜</a>
+      <!-- Nav CTA Buttons -->
+      <div class="nav-cta-group" id="navAuthButtonGroup">
+        <button id="btnNavSignIn" class="btn btn-ghost">Sign In</button>
+        <button id="btnNavSignUp" class="btn btn-white">Create Account</button>
+        <button id="btnNavNewMeeting" class="btn btn-primary">
+          <span>📹</span> New Meeting
+        </button>
       </div>
 
-      <div class="nav-actions" id="navUserCapsule" style="display: none;">
-        <div class="user-capsule">
-          <div class="user-avatar-dot">📞</div>
-          <div class="user-capsule-info">
-            <span class="user-capsule-name" id="navUserName">Caller</span>
-            <span class="user-capsule-id" id="navUserCallerId">#000-000</span>
-          </div>
+      <!-- Logged-In User Profile Pill -->
+      <div class="nav-cta-group" id="navUserCapsule" style="display: none;">
+        <div class="user-badge-capsule">
+          <div class="user-avatar-pill">👤</div>
+          <span class="user-info-text" id="navUserDisplayName">User</span>
         </div>
-        <a href="/app" class="btn btn-emerald" id="btnEnterApp">Enter App ➜</a>
-        <button id="navLogoutBtn" class="btn btn-ghost" style="padding: 0.5rem 0.8rem; font-size: 0.8rem;">Logout</button>
+        <a href="/app" class="btn btn-emerald" id="btnEnterConsole">Enter Meeting ➜</a>
+        <button id="navUserLogoutBtn" class="btn btn-ghost" style="padding: 0.4rem 0.75rem; font-size: 0.8rem;">Logout</button>
       </div>
     </div>
   </header>
 
   <!-- Hero Section -->
-  <section class="hero-section">
-    <div class="container hero-grid">
-      <div class="hero-content">
-        <div class="hero-pill">
-          <span class="pulse-indicator"></span>
-          ZERO-BUSY WEBRTC CALLING NETWORK • 100% FREE
-        </div>
+  <section class="hero-wrap">
+    <div class="container">
+      <div class="hero-pill-badge">
+        <span class="pulse-circle"></span>
+        NEXT-GEN WEBRTC VIDEO • 100% IN-BROWSER
+      </div>
 
-        <h1 class="hero-title">
-          Never Miss a Call.<br>
-          <span class="gradient-text">Never Hear a Busy Tone.</span>
-        </h1>
+      <h1 class="hero-heading">
+        Video meetings built for<br>
+        <span class="gradient-word">uninterrupted focus.</span>
+      </h1>
 
-        <p class="hero-desc">
-          Instant 6-digit permanent phone numbers for studio HD video and crystal-clear audio calls. 
-          No SIM card required, guaranteed zero busy signals, and end-to-end peer encrypted right in your browser.
-        </p>
+      <p class="hero-subtitle">
+        Connect with anyone in pristine HD video and studio-grade audio with a single click. 
+        Zero downloads, zero app store barriers, and guaranteed zero busy rejections.
+      </p>
 
-        <div class="hero-actions">
-          <a href="/app" class="btn btn-primary btn-lg" id="heroLaunchAppBtn">
-            <span>🚀</span> Launch Calling App
-          </a>
-          <button id="btnHeroSignUp" class="btn btn-outline btn-lg">
-            <span>✨</span> Get Free 6-Digit ID
-          </button>
-          <button id="btnHeroGuest" class="btn btn-ghost" title="Direct instant entry without registration">
-            <span>⚡</span> Guest Pass
-          </button>
-        </div>
-
-        <div class="hero-metrics">
-          <div class="metric-item">
-            <b>0 ms</b>
-            <span>Busy Wait Time</span>
-          </div>
-          <div class="metric-item">
-            <b>6-Digit</b>
-            <span>Permanent Number</span>
-          </div>
-          <div class="metric-item">
-            <b>100% P2P</b>
-            <span>Encrypted Streams</span>
-          </div>
-          <div class="metric-item">
-            <b>4K / HD</b>
-            <span>Adaptive WebRTC</span>
-          </div>
+      <!-- Instant Meeting Action Console -->
+      <div class="hero-meeting-bar">
+        <button id="btnHeroNewMeeting" class="btn btn-primary btn-lg">
+          <span>📹</span> Start Instant Meeting
+        </button>
+        
+        <div class="join-input-wrap">
+          <input 
+            type="text" 
+            id="heroMeetingInput" 
+            class="join-input" 
+            placeholder="Enter meeting link or code..."
+            autocomplete="off"
+          >
+          <button id="btnHeroJoinMeeting" class="btn-join">Join ➜</button>
         </div>
       </div>
 
-      <!-- Hero Phone / Call Simulator Widget -->
-      <div class="hero-preview-box">
-        <div class="preview-glow-backdrop"></div>
-        <div class="simulator-device">
-          <div class="simulator-header">
-            <div class="sim-status">
-              <span class="pulse-indicator"></span>
-              LIVE NETWORK CONNECTED
+      <!-- Hero Meeting Showcase Display -->
+      <div class="hero-showcase">
+        <div class="showcase-window">
+          <div class="showcase-topbar">
+            <div class="window-dots">
+              <span class="dot-red"></span>
+              <span class="dot-yellow"></span>
+              <span class="dot-green"></span>
             </div>
-            <div class="sim-id-badge" id="simMyIdDisplay">#583-912</div>
-          </div>
-
-          <!-- Simulated Incoming Call Card -->
-          <div class="sim-call-card">
-            <div class="sim-avatar-pulse">📹</div>
-            <div class="sim-call-title">INCOMING VIDEO CALL</div>
-            <div class="sim-caller-name">ID #849-210</div>
-            <p class="sim-call-desc">Caller is ringing on your Permanent ID. Zero-Busy active!</p>
-            
-            <div class="sim-action-row">
-              <button id="simAnswerBtn" class="btn-sim-answer">
-                <span>📞</span> ANSWER CALL
-              </button>
-              <button id="simDeclineBtn" class="btn-sim-decline">
-                <span>❌</span> DECLINE
-              </button>
+            <div class="meeting-pill-info">
+              <span class="pulse-circle"></span>
+              1080p 60fps • End-to-End Encrypted
+            </div>
+            <div style="font-family: var(--font-ui); font-size: 0.78rem; font-weight: 700; color: #10b981;">
+              ⚡ Live Mesh
             </div>
           </div>
 
-          <!-- Quick Test Dial Bar -->
-          <div class="sim-dial-box">
-            <span style="font-size: 1.1rem;">📞</span>
-            <input 
-              type="text" 
-              id="simDialInput" 
-              class="sim-input" 
-              placeholder="Enter ID (e.g. 849-210)" 
-              maxlength="10"
-            >
-            <button id="simDialBtn" class="btn-sim-dial">Call Now ➜</button>
+          <div class="meeting-stage-grid">
+            <!-- Active Video Stream Preview -->
+            <div class="stage-video-card">
+              <div class="video-sim-avatar">📹</div>
+              <div class="video-card-overlay">
+                <span class="participant-tag">You (Presenter)</span>
+                <div class="wave-audio-bar">
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                  <span class="wave-bar"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Side Interactive Widgets -->
+            <div class="stage-side-panel">
+              <div class="side-incoming-widget">
+                <div class="widget-head">
+                  <span class="widget-label">Incoming Participant</span>
+                  <span style="font-size: 0.75rem; color: #64748b;">Ringing...</span>
+                </div>
+                <div class="widget-caller">Sarah Jenkins</div>
+                <div class="widget-sub">Requesting to join active session (Zero-Busy active)</div>
+                <div class="widget-btns">
+                  <a href="/app" class="btn-card-accept" style="text-decoration:none; text-align:center;">Accept</a>
+                  <button class="btn-card-decline" onclick="this.parentElement.parentElement.style.opacity='0.6';">Hold</button>
+                </div>
+              </div>
+
+              <div class="side-stats-widget">
+                <div class="stat-metric">
+                  <b>0 ms</b>
+                  <span>Busy Drop Time</span>
+                </div>
+                <div class="stat-metric">
+                  <b>4K HD</b>
+                  <span>Adaptive Video</span>
+                </div>
+                <div class="stat-metric">
+                  <b>100%</b>
+                  <span>P2P Direct</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="showcase-control-bar">
+            <button class="pill-ctrl-btn" title="Microphone">🎙️</button>
+            <button class="pill-ctrl-btn" title="Camera">📹</button>
+            <button class="pill-ctrl-btn" title="Screen Share">🖥️</button>
+            <a href="/app" class="pill-ctrl-btn red" title="End / Leave" style="text-decoration:none;">📞</a>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Problem vs Solution: Why Zero-Busy? -->
-  <section class="section-py" id="zerobusy">
+  <!-- Problem vs Solution: Why MeetFlow Architecture -->
+  <section class="section-pad" id="architecture">
     <div class="container">
-      <div class="section-head">
-        <div class="section-tag">Breakthrough Engineering</div>
-        <h2 class="section-title">The End of the "User is on Another Call" Frustration</h2>
-        <p class="section-sub">
-          Traditional phone systems drop urgent calls with an irritating busy tone. Non-Stop Call redefines communication with intelligent real-time Call Waiting and 1-click group merging.
+      <div class="section-intro">
+        <div class="eyebrow-tag">Intelligent Signaling</div>
+        <h2 class="section-headline">Why Traditional Calling Drops Your Most Important Conversations</h2>
+        <p class="section-lead">
+          Traditional phones and apps reject incoming calls with a cold busy tone. MeetFlow is engineered with automatic queuing and 1-click meeting merges.
         </p>
       </div>
 
-      <div class="comparison-grid">
-        <!-- Traditional Card -->
-        <div class="compare-card bad">
-          <div class="compare-badge">❌ Traditional Mobile & WhatsApp</div>
-          <h3 class="compare-title">Busy Signals & Missed Connections</h3>
-          <ul class="compare-list">
-            <li>
-              <span class="icon">🚫</span>
-              <span><b>Immediate Rejection:</b> Callers get a harsh "User is on another call" tone and are forcefully hung up on.</span>
-            </li>
-            <li>
-              <span class="icon">🚫</span>
-              <span><b>Critical Emergencies Lost:</b> You never know who is trying to reach you while on an active line.</span>
-            </li>
-            <li>
-              <span class="icon">🚫</span>
-              <span><b>SIM Card & Phone Tied:</b> Requires purchasing a SIM card, sharing personal mobile numbers, and paying monthly fees.</span>
-            </li>
-            <li>
-              <span class="icon">🚫</span>
-              <span><b>App Installation Barrier:</b> Both parties must install heavy proprietary apps from app stores.</span>
-            </li>
-          </ul>
-        </div>
+      <div class="architecture-box">
+        <div class="arch-dual-grid">
+          <!-- Traditional -->
+          <div class="arch-side-card traditional">
+            <div class="arch-badge-tag">❌ Legacy Apps (Zoom / WhatsApp / Cellular)</div>
+            <h3 class="arch-card-title">Busy Signals & Dropped Communication</h3>
+            <ul class="arch-checklist">
+              <li>
+                <span class="icon">🚫</span>
+                <span><b>Harsh Busy Signals:</b> Callers are hung up on with an abrasive "User is in another call" tone.</span>
+              </li>
+              <li>
+                <span class="icon">🚫</span>
+                <span><b>Forced App Installations:</b> Both sides are forced to install heavy client software and app updates.</span>
+              </li>
+              <li>
+                <span class="icon">🚫</span>
+                <span><b>Account & Sign-In Walls:</b> Frustrating 10-step password resets and verification codes before joining.</span>
+              </li>
+              <li>
+                <span class="icon">🚫</span>
+                <span><b>Central Server Recording:</b> Media traffic flows through corporate recording and logging servers.</span>
+              </li>
+            </ul>
+          </div>
 
-        <!-- Non-Stop Call Card -->
-        <div class="compare-card good">
-          <div class="compare-badge">✅ Non-Stop Call Architecture</div>
-          <h3 class="compare-title">100% Ringing Guarantee & Instant Merge</h3>
-          <ul class="compare-list">
-            <li>
-              <span class="icon">⚡</span>
-              <span><b>Zero-Busy Guarantee:</b> Callers always hear a pleasant normal ringing tone. No busy signals ever.</span>
-            </li>
-            <li>
-              <span class="icon">⚡</span>
-              <span><b>Dynamic Call Waiting HUD:</b> Real-time notification pops up showing who is calling and their 6-digit ID.</span>
-            </li>
-            <li>
-              <span class="icon">⚡</span>
-              <span><b>1-Click Group Conference:</b> Answer on hold or seamlessly merge the new caller into a 3-way conference.</span>
-            </li>
-            <li>
-              <span class="icon">⚡</span>
-              <span><b>Zero Installation:</b> Open any modern browser on any phone, tablet, or PC and start calling instantly.</span>
-            </li>
-          </ul>
+          <!-- MeetFlow -->
+          <div class="arch-side-card modern">
+            <div class="arch-badge-tag">✅ MeetFlow Architecture</div>
+            <h3 class="arch-card-title">100% Ringing Guarantee & Instant Merge</h3>
+            <ul class="arch-checklist">
+              <li>
+                <span class="icon">⚡</span>
+                <span><b>Zero-Busy Guarantee:</b> Callers always ring through smoothly. Never hear a busy signal again.</span>
+              </li>
+              <li>
+                <span class="icon">⚡</span>
+                <span><b>1-Click Multi-Party Merge:</b> Seamlessly accept waiting participants into an instant 3-way conference.</span>
+              </li>
+              <li>
+                <span class="icon">⚡</span>
+                <span><b>Pure Browser Freedom:</b> Works instantly on iOS Safari, Android Chrome, Mac, Windows, and Linux.</span>
+              </li>
+              <li>
+                <span class="icon">⚡</span>
+                <span><b>Direct Encrypted Mesh:</b> Ultra-low latency DTLS-SRTP WebRTC packets stream directly peer-to-peer.</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Features Grid Section -->
-  <section class="section-py" id="features">
+  <!-- Core Features Section (Luxury Pure White Cards) -->
+  <section class="section-pad" id="features">
     <div class="container">
-      <div class="section-head">
-        <div class="section-tag">Core Features</div>
-        <h2 class="section-title">Built for Effortless, Uninterrupted Calling</h2>
-        <p class="section-sub">
-          A full-featured calling ecosystem engineered with WebRTC peer-to-peer technology and modern glassmorphic aesthetics.
+      <div class="section-intro">
+        <div class="eyebrow-tag">Engineered For Performance</div>
+        <h2 class="section-headline">Everything You Need for Effortless Video Communication</h2>
+        <p class="section-lead">
+          Pristine audio fidelity, adaptive hardware-accelerated video, and zero friction from start to finish.
         </p>
       </div>
 
-      <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon">🆔</div>
-          <h3 class="feature-title">Permanent 6-Digit ID</h3>
-          <p class="feature-desc">
-            Your unique 6-digit number (e.g. #583-912) stays permanently saved on your device or account. Share it just like a phone number.
+      <div class="features-grid-box">
+        <div class="feature-cell">
+          <div class="feature-icon-bubble">⚡</div>
+          <h3 class="feature-title-text">Instant 1-Click Meetings</h3>
+          <p class="feature-desc-text">
+            Launch a meeting in one second. Share your clean meeting link with anyone and they join immediately without signing up.
           </p>
         </div>
 
-        <div class="feature-card">
-          <div class="feature-icon">⚡</div>
-          <h3 class="feature-title">Zero-Busy Engine</h3>
-          <p class="feature-desc">
-            Never reject another caller. Even when in an active call, secondary callers ring normally while you receive a Call Waiting alert.
+        <div class="feature-cell">
+          <div class="feature-icon-bubble">🎙️</div>
+          <h3 class="feature-title-text">Studio HD Audio Fidelity</h3>
+          <p class="feature-desc-text">
+            Integrated acoustic echo cancellation, automated gain control, and background noise suppression keep your voice crystal-clear.
           </p>
         </div>
 
-        <div class="feature-card">
-          <div class="feature-icon">🔗</div>
-          <h3 class="feature-title">1-Click WhatsApp Share</h3>
-          <p class="feature-desc">
-            Share your direct link with 1 click. When friends tap your link, your ID auto-fills and connects instantly without typing.
+        <div class="feature-cell">
+          <div class="feature-icon-bubble">📹</div>
+          <h3 class="feature-title-text">Adaptive 1080p Video</h3>
+          <p class="feature-desc-text">
+            Intelligent resolution negotiation that dynamically adapts to bandwidth fluctuations for silky-smooth, glitch-free video.
           </p>
         </div>
 
-        <div class="feature-card">
-          <div class="feature-icon">📹</div>
-          <h3 class="feature-title">Ultra HD Video & Voice</h3>
-          <p class="feature-desc">
-            Direct peer-to-peer WebRTC mesh with acoustic echo cancellation, automatic gain control, and hardware-accelerated video.
+        <div class="feature-cell">
+          <div class="feature-icon-bubble">👥</div>
+          <h3 class="feature-title-text">3-Way Conference Merge</h3>
+          <p class="feature-desc-text">
+            Easily merge incoming participants into a group conversation or hold and switch between ongoing meetings with one tap.
           </p>
         </div>
 
-        <div class="feature-card">
-          <div class="feature-icon">👥</div>
-          <h3 class="feature-title">3-Way Call Merge</h3>
-          <p class="feature-desc">
-            Effortlessly merge incoming callers into a multi-party group conference or hold and switch between ongoing calls.
+        <div class="feature-cell">
+          <div class="feature-icon-bubble">📱</div>
+          <h3 class="feature-title-text">Universal Browser Support</h3>
+          <p class="feature-desc-text">
+            Zero app downloads. Open on iPhone, iPad, Android phone, Windows PC, or Mac. It runs natively in every modern browser.
           </p>
         </div>
 
-        <div class="feature-card">
-          <div class="feature-icon">🔒</div>
-          <h3 class="feature-title">Private & Peer-to-Peer</h3>
-          <p class="feature-desc">
-            Encrypted DTLS-SRTP media packets flow directly between devices. No corporate recording servers or third-party listeners.
-          </p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- How It Works Section -->
-  <section class="section-py" id="howitworks">
-    <div class="container">
-      <div class="section-head">
-        <div class="section-tag">Simple 3-Step Setup</div>
-        <h2 class="section-title">Start Calling in 10 Seconds</h2>
-        <p class="section-sub">
-          No credit card, no app download, and no phone verification needed.
-        </p>
-      </div>
-
-      <div class="steps-grid">
-        <div class="step-card">
-          <span class="step-number">01</span>
-          <div class="step-badge">1</div>
-          <h3 class="step-title">Claim Your 6-Digit ID</h3>
-          <p class="step-desc">
-            Generate an instant disposable number with 1 click or create a free account to customize your personal permanent caller ID.
-          </p>
-        </div>
-
-        <div class="step-card">
-          <span class="step-number">02</span>
-          <div class="step-badge">2</div>
-          <h3 class="step-title">Share Your Direct Link</h3>
-          <p class="step-desc">
-            Send your unique call link on WhatsApp, Telegram, or SMS. Anyone with a web browser can click and call you directly.
-          </p>
-        </div>
-
-        <div class="step-card">
-          <span class="step-number">03</span>
-          <div class="step-badge">3</div>
-          <h3 class="step-title">Enjoy Non-Stop Calling</h3>
-          <p class="step-desc">
-            Talk in crystal-clear HD audio and video with the confidence that you will never miss incoming calls to busy tones.
+        <div class="feature-cell">
+          <div class="feature-icon-bubble">🔒</div>
+          <h3 class="feature-title-text">Peer-to-Peer Privacy</h3>
+          <p class="feature-desc-text">
+            Encrypted media streams travel directly between participants. No central servers eavesdropping or recording your calls.
           </p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- CTA Banner -->
-  <section class="section-py">
+  <!-- How It Works (Steps) -->
+  <section class="section-pad" id="howitworks">
     <div class="container">
-      <div class="cta-banner">
-        <h2 class="cta-title">Ready for Uninterrupted Calling?</h2>
-        <p class="cta-desc">
-          Join thousands of users enjoying crystal-clear video and audio calls with zero busy signals. Claim your free 6-digit number now.
+      <div class="section-intro">
+        <div class="eyebrow-tag">Simple Three-Step Flow</div>
+        <h2 class="section-headline">Start Talking in Under Ten Seconds</h2>
+        <p class="section-lead">
+          No credit card, no software installers, and no complex configuration.
         </p>
-        <div class="cta-actions">
-          <a href="/app" class="btn btn-primary btn-lg">
-            <span>🚀</span> Launch Calling Console
-          </a>
-          <button id="btnCtaSignUp" class="btn btn-outline btn-lg">
+      </div>
+
+      <div class="steps-row">
+        <div class="step-card-box">
+          <div class="step-count-pill">1</div>
+          <h3 class="step-heading">Create or Join a Room</h3>
+          <p class="step-explanation">
+            Click "Start Instant Meeting" or enter an existing meeting code. Your video and microphone connect immediately.
+          </p>
+        </div>
+
+        <div class="step-card-box">
+          <div class="step-count-pill">2</div>
+          <h3 class="step-heading">Share Your Meeting Link</h3>
+          <p class="step-explanation">
+            Send the link over WhatsApp, Slack, iMessage, or email. Your guests click the link and enter directly into the room.
+          </p>
+        </div>
+
+        <div class="step-card-box">
+          <div class="step-count-pill">3</div>
+          <h3 class="step-heading">Enjoy Uninterrupted HD Calls</h3>
+          <p class="step-explanation">
+            Talk in crystal-clear audio and video with the assurance that waiting calls can be merged or answered seamlessly.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Luxury Call To Action Banner -->
+  <section class="section-pad">
+    <div class="container">
+      <div class="cta-luxury-card">
+        <h2 class="cta-main-title">Ready for Seamless Video Meetings?</h2>
+        <p class="cta-sub-copy">
+          Experience the freedom of instant browser-based video conferencing with guaranteed zero busy signals.
+        </p>
+        <div class="cta-btn-set">
+          <button id="btnCtaNewMeeting" class="btn btn-primary btn-lg" style="background:#ffffff; color:#312e81; font-weight:800;">
+            <span>📹</span> Start Instant Meeting
+          </button>
+          <button id="btnCtaSignUp" class="btn btn-white btn-lg" style="background:rgba(255,255,255,0.12); color:#ffffff; border-color:rgba(255,255,255,0.25);">
             <span>✨</span> Create Free Account
           </button>
         </div>
@@ -339,230 +360,214 @@
     </div>
   </section>
 
-  <!-- FAQ Section -->
-  <section class="section-py" id="faq">
+  <!-- FAQ Section (Accordion) -->
+  <section class="section-pad" id="faq">
     <div class="container">
-      <div class="section-head">
-        <div class="section-tag">Got Questions?</div>
-        <h2 class="section-title">Frequently Asked Questions</h2>
-        <p class="section-sub">
-          Everything you need to know about Non-Stop Call and the Zero-Busy network.
+      <div class="section-intro">
+        <div class="eyebrow-tag">Common Questions</div>
+        <h2 class="section-headline">Frequently Asked Questions</h2>
+        <p class="section-lead">
+          Everything you need to know about MeetFlow and our video architecture.
         </p>
       </div>
 
-      <div class="faq-wrap">
-        <div class="faq-item active">
-          <button class="faq-question">
-            <span>Do I need a SIM card or phone number to use this?</span>
-            <span class="faq-icon">+</span>
+      <div class="faq-container-narrow">
+        <div class="faq-card-unit open">
+          <button class="faq-toggle-btn">
+            <span>Do my guests need an account or software download?</span>
+            <span class="faq-symbol">+</span>
           </button>
-          <div class="faq-answer">
-            No! You do not need a SIM card, phone number, or mobile carrier. When you open Non-Stop Call, you are assigned a permanent 6-digit Unique ID (like #583-912) that works like your private phone number worldwide over the internet.
+          <div class="faq-body-content">
+            No! Guests do not need to download any app, create an account, or install plugins. When you send them a meeting link, they tap it and connect straight from their web browser in seconds.
           </div>
         </div>
 
-        <div class="faq-item">
-          <button class="faq-question">
+        <div class="faq-card-unit">
+          <button class="faq-toggle-btn">
             <span>How does the Zero-Busy guarantee work?</span>
-            <span class="faq-icon">+</span>
+            <span class="faq-symbol">+</span>
           </button>
-          <div class="faq-answer">
-            Traditional networks send a "Busy" rejection signal when a receiver is already on a call. Our real-time signaling engine keeps the caller ringing smoothly while displaying a Call Waiting heads-up banner on the receiver's screen with options to Answer, Hold, or Merge into a 3-way conference.
+          <div class="faq-body-content">
+            When you are already in an active meeting and another peer calls your room, our signaling engine prevents any busy rejection. The caller hears a natural ringing tone while you get an unobtrusive Call Waiting alert with options to Answer, Hold, or Merge into a 3-way conference.
           </div>
         </div>
 
-        <div class="faq-item">
-          <button class="faq-question">
-            <span>Is Non-Stop Call completely free?</span>
-            <span class="faq-icon">+</span>
+        <div class="faq-card-unit">
+          <button class="faq-toggle-btn">
+            <span>Is MeetFlow free to use?</span>
+            <span class="faq-symbol">+</span>
           </button>
-          <div class="faq-answer">
-            Yes, 100% free! There are no hidden fees, subscriptions, or minutes limits. It runs on direct peer-to-peer WebRTC technology.
+          <div class="faq-body-content">
+            Yes, MeetFlow is 100% free with unlimited meeting minutes. It leverages peer-to-peer WebRTC technology to deliver studio-quality communication without costly server intermediaries.
           </div>
         </div>
 
-        <div class="faq-item">
-          <button class="faq-question">
+        <div class="faq-card-unit">
+          <button class="faq-toggle-btn">
             <span>Does it work on mobile phones and tablets?</span>
-            <span class="faq-icon">+</span>
+            <span class="faq-symbol">+</span>
           </button>
-          <div class="faq-answer">
-            Yes! It works natively in all standard mobile browsers (Safari on iOS, Chrome on Android, Firefox, and Edge) without installing any application from the App Store or Play Store.
+          <div class="faq-body-content">
+            Yes, it works natively in Safari on iOS, Chrome on Android, Firefox, and Edge on all mobile devices and tablets with full camera and microphone access.
           </div>
         </div>
 
-        <div class="faq-item">
-          <button class="faq-question">
-            <span>Are my calls private and secure?</span>
-            <span class="faq-icon">+</span>
+        <div class="faq-card-unit">
+          <button class="faq-toggle-btn">
+            <span>Are my meetings encrypted and private?</span>
+            <span class="faq-symbol">+</span>
           </button>
-          <div class="faq-answer">
-            All audio and video streams are encrypted end-to-end using standardized WebRTC DTLS and SRTP encryption. Media packets travel directly between peer devices without passing through recording media servers.
+          <div class="faq-body-content">
+            All audio and video streams are encrypted end-to-end using standardized WebRTC DTLS and SRTP encryption. Media packets travel directly between peer devices without passing through recording servers.
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Footer -->
-  <footer class="site-footer">
+  <!-- Site Footer -->
+  <footer class="site-footer-area">
     <div class="container">
-      <div class="footer-row">
-        <a href="/" class="brand-link">
-          <div class="brand-icon-box" style="width: 32px; height: 32px;">
+      <div class="footer-inner-flex">
+        <a href="/" class="brand-wrap">
+          <div class="brand-mark" style="width: 32px; height: 32px;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              <path d="M15 10l5-5v14l-5-5"></path>
+              <rect x="2" y="6" width="13" height="12" rx="3"></rect>
             </svg>
           </div>
-          <div class="brand-name" style="font-size: 1.1rem;">NonStop<span>Call</span></div>
+          <div class="brand-name" style="font-size: 1.15rem;">Meet<span>Flow</span></div>
         </a>
 
-        <div class="footer-status">
-          <span class="pulse-indicator"></span>
-          Signaling Network: 100% Operational
+        <div class="footer-uptime-indicator">
+          <span class="pulse-circle"></span>
+          Global Signaling Network: 100% Operational
         </div>
 
-        <div class="footer-copy">
-          © 2026 Non-Stop Call. Direct WebRTC Zero-Busy Network. All rights reserved.
+        <div class="footer-copy-text">
+          © 2026 MeetFlow. Seamless WebRTC Video Conferencing. All rights reserved.
         </div>
       </div>
     </div>
   </footer>
 
   <!-- ==========================================================================
-       Auth Modal (Login & Sign Up & Guest)
+       Clean White Auth Modal (Sign In & Sign Up & Guest)
        ========================================================================== -->
-  <div class="auth-modal-backdrop" id="authModal">
-    <div class="auth-card">
-      <button class="auth-close-btn" id="closeAuthModalBtn" title="Close dialog">✕</button>
+  <div class="auth-popup-backdrop" id="authPopupBackdrop">
+    <div class="auth-white-card">
+      <button class="auth-dismiss-btn" id="authDismissBtn" title="Close">✕</button>
 
-      <!-- Tab Switcher -->
-      <div class="auth-tabs">
-        <button class="auth-tab-btn active" id="tabSignInBtn">Sign In</button>
-        <button class="auth-tab-btn" id="tabSignUpBtn">Create Account</button>
+      <!-- Segment Tabs -->
+      <div class="auth-segment-tabs">
+        <button class="auth-tab-choice selected" id="tabChoiceSignIn">Sign In</button>
+        <button class="auth-tab-choice" id="tabChoiceSignUp">Create Account</button>
       </div>
 
-      <!-- Sign In Form -->
-      <form class="auth-form" id="signInForm">
-        <div class="auth-header">
-          <h3 class="auth-title">Welcome Back</h3>
-          <p class="auth-subtitle">Enter your Permanent ID or Email to access your calling console</p>
+      <!-- Form: Sign In -->
+      <form class="auth-entry-form" id="formSignIn">
+        <div class="auth-title-block">
+          <h3 class="auth-card-heading">Welcome Back</h3>
+          <p class="auth-card-lead">Sign in to your account to access your meetings</p>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="loginIdInput">Caller ID or Email</label>
+        <div class="input-entry-field">
+          <label class="input-entry-label" for="loginEmailInput">Email Address</label>
           <input 
-            type="text" 
-            id="loginIdInput" 
-            class="form-input" 
-            placeholder="e.g. 583-912 or user@email.com" 
+            type="email" 
+            id="loginEmailInput" 
+            class="input-text-control" 
+            placeholder="name@company.com" 
             required
-            autocomplete="username"
+            autocomplete="email"
           >
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="loginPassInput">Password / PIN</label>
+        <div class="input-entry-field">
+          <label class="input-entry-label" for="loginPasswordInput">Password</label>
           <input 
             type="password" 
-            id="loginPassInput" 
-            class="form-input" 
-            placeholder="Enter your password or PIN" 
+            id="loginPasswordInput" 
+            class="input-text-control" 
+            placeholder="Enter your password" 
             required
             autocomplete="current-password"
           >
         </div>
 
-        <button type="submit" class="btn btn-primary auth-submit-btn">
-          <span>🚀</span> Sign In & Launch App
+        <button type="submit" class="btn btn-primary btn-auth-action">
+          Sign In & Start Meeting
         </button>
 
-        <div class="auth-divider">or continue without account</div>
+        <div class="auth-line-divider">or continue without account</div>
 
-        <button type="button" class="btn-guest-pass" id="btnGuestPass1">
-          <span>⚡</span> Continue as Guest (Instant Random ID)
+        <button type="button" class="btn-guest-direct" id="btnGuestPassSignIn">
+          <span>⚡</span> Continue as Guest (Instant Access)
         </button>
       </form>
 
-      <!-- Sign Up Form -->
-      <form class="auth-form" id="signUpForm" style="display: none;">
-        <div class="auth-header">
-          <h3 class="auth-title">Claim Your Permanent Number</h3>
-          <p class="auth-subtitle">Get your free permanent 6-digit number to receive calls anytime</p>
+      <!-- Form: Sign Up -->
+      <form class="auth-entry-form" id="formSignUp" style="display: none;">
+        <div class="auth-title-block">
+          <h3 class="auth-card-heading">Create Free Account</h3>
+          <p class="auth-card-lead">Get unlimited video meetings and persistent rooms</p>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="regNameInput">Full Name</label>
+        <div class="input-entry-field">
+          <label class="input-entry-label" for="signupNameInput">Full Name</label>
           <input 
             type="text" 
-            id="regNameInput" 
-            class="form-input" 
+            id="signupNameInput" 
+            class="input-text-control" 
             placeholder="e.g. Alex Morgan" 
             required
             autocomplete="name"
           >
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="regEmailInput">Email Address</label>
+        <div class="input-entry-field">
+          <label class="input-entry-label" for="signupEmailInput">Email Address</label>
           <input 
             type="email" 
-            id="regEmailInput" 
-            class="form-input" 
-            placeholder="e.g. alex@example.com" 
+            id="signupEmailInput" 
+            class="input-text-control" 
+            placeholder="alex@company.com" 
             required
             autocomplete="email"
           >
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="regCallerIdInput">Your 6-Digit Permanent Caller ID</label>
-          <div class="form-input-wrap">
-            <input 
-              type="text" 
-              id="regCallerIdInput" 
-              class="form-input" 
-              placeholder="e.g. 583-912" 
-              maxlength="10" 
-              required
-            >
-            <button type="button" class="input-btn-roll" id="rollNumberBtn" title="Generate fresh number combination">
-              🎲 Roll
-            </button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label" for="regPassInput">Create Password / PIN</label>
+        <div class="input-entry-field">
+          <label class="input-entry-label" for="signupPasswordInput">Create Password</label>
           <input 
             type="password" 
-            id="regPassInput" 
-            class="form-input" 
-            placeholder="Choose a password or PIN" 
+            id="signupPasswordInput" 
+            class="input-text-control" 
+            placeholder="At least 6 characters" 
             required
             autocomplete="new-password"
           >
         </div>
 
-        <button type="submit" class="btn btn-emerald auth-submit-btn">
-          <span>🎉</span> Register & Claim My Number
+        <button type="submit" class="btn btn-emerald btn-auth-action">
+          <span>✨</span> Create Free Account
         </button>
 
-        <div class="auth-divider">or skip signup</div>
+        <div class="auth-line-divider">or continue without account</div>
 
-        <button type="button" class="btn-guest-pass" id="btnGuestPass2">
-          <span>⚡</span> Instant Disposable Pass
+        <button type="button" class="btn-guest-direct" id="btnGuestPassSignUp">
+          <span>⚡</span> Instant Guest Entry
         </button>
       </form>
     </div>
   </div>
 
-  <!-- Landing Toast Notification -->
-  <div class="landing-toast" id="landingToast">
-    <span style="font-size: 1.2rem;">🔔</span>
-    <span id="toastMessage">Welcome to Non-Stop Call</span>
+  <!-- Floating Toast Notification -->
+  <div class="floating-status-toast" id="floatingStatusToast">
+    <span style="font-size: 1.1rem;">🔔</span>
+    <span id="statusToastText">Welcome to MeetFlow</span>
   </div>
 
-  <script src="landing.js?v=1"></script>
+  <script src="landing.js?v=5"></script>
 </body>
 </html>

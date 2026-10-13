@@ -3,408 +3,287 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Non-Stop Calling Console | Clean Light Edition</title>
+  <title>MeetFlow | HD Video Meeting Studio</title>
+  <meta name="description" content="HD WebRTC Video Meeting Studio. 100% In-browser, 1-click link join, zero busy signals.">
+
+  <!-- Perfection Typography: Outfit (Headlines) & Plus Jakarta Sans / Inter (Body & UI) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=11">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
-<body class="light-theme">
-  <div class="app-shell">
-    <!-- Top Header (Clean White Design) -->
-    <header class="app-header">
-      <div class="brand">
-        <div class="brand-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-          </svg>
-        </div>
-        <div>
-          <h1>Non-Stop Calling System</h1>
-          <p class="subtitle">Direct Unique ID • Zero-Busy Engine • Video & Audio Calls</p>
+<body class="meeting-body">
+
+  <!-- Ambient background glow -->
+  <div class="ambient-glow-top"></div>
+
+  <!-- Main Meeting Shell -->
+  <div class="meeting-shell">
+    
+    <!-- Top Header: Modern Glass Navbar -->
+    <header class="meeting-header">
+      <div class="header-left">
+        <a href="/" class="brand-link" title="Return to Home">
+          <div class="brand-badge">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 10l5-5v14l-5-5"></path>
+              <rect x="2" y="6" width="13" height="12" rx="3"></rect>
+            </svg>
+          </div>
+          <span class="brand-text">Meet<span>Flow</span></span>
+        </a>
+
+        <!-- Room Name & Link Pill -->
+        <div class="room-capsule" id="roomCapsule">
+          <span class="pulse-dot"></span>
+          <span class="room-prefix">Room:</span>
+          <span class="room-title" id="roomTitleDisplay">loading-room</span>
+          <button id="copyInviteLinkBtn" class="capsule-copy-btn" title="Copy Meeting Link">
+            <span>📋</span> Copy Link
+          </button>
         </div>
       </div>
 
-      <!-- User Unique ID HUD (Permanent like a Phone Number) -->
-      <div class="my-id-card">
-        <div class="id-meta">
-          <span class="id-label">YOUR PERMANENT ID:</span>
-          <span class="id-digits" id="myDisplayId">--- ---</span>
+      <!-- Center Status: Duration & Quality -->
+      <div class="header-center">
+        <div class="status-hud">
+          <span class="duration-badge" id="meetingDurationBadge">⏱️ 00:00</span>
+          <span class="quality-badge" id="meetingQualityBadge">⚡ 1080p HD • Live Mesh</span>
         </div>
-        <button id="copyIdBtn" class="btn-copy" title="Copy your ID">
-          <span>📋</span> Copy ID
-        </button>
-        <button id="shareLinkBtn" class="btn-copy" style="background: linear-gradient(135deg, #059669, #10b981);" title="Share Direct Call Link">
-          <span>🔗</span> Share Link
-        </button>
-        <button id="editIdBtn" class="btn-ghost-sm" title="Change or set your custom permanent ID">✏️ Set My ID</button>
-        <a href="/" class="btn-ghost-sm" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 700; color: #4338ca;" title="Landing Page">🏠 Home</a>
       </div>
-      <script>
-        (function() {
-          try {
-            var id = localStorage.getItem('permanent_caller_id');
-            if (!id || id === 'null' || id === 'undefined' || id.trim().length < 3) {
-              var n1 = Math.floor(100 + Math.random() * 900);
-              var n2 = Math.floor(100 + Math.random() * 900);
-              id = n1 + '-' + n2;
-              localStorage.setItem('permanent_caller_id', id);
-            }
-            var el = document.getElementById('myDisplayId');
-            if (el) el.textContent = id;
-          } catch(e) {}
-        })();
-      </script>
+
+      <!-- Right Controls: Profile & Navigation -->
+      <div class="header-right">
+        <!-- User Profile Pill -->
+        <div class="user-pill" id="userProfilePill" title="Click to change your display name">
+          <div class="user-avatar-circle" id="userAvatarCircle">👤</div>
+          <span class="user-name-text" id="userDisplayName">You</span>
+          <button id="editDisplayNameBtn" class="pill-edit-icon" title="Edit name">✏️</button>
+        </div>
+
+        <a href="/" class="btn-ghost-nav" title="Back to Landing Page">🏠 Home</a>
+      </div>
     </header>
 
-    <!-- Real-time Status Notice -->
-    <div id="connectionNoticeBanner" style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 1.25rem; background: #f0fdf4; border-bottom: 1px solid #bbf7d0; font-size: 0.8rem; color: #166534;">
-      <div style="display: flex; align-items: center; gap: 0.5rem;">
-        <span id="networkStatusDot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span>
-        <span id="networkStatusText"><b>Server Connected:</b> Ready for real-time video & audio calls</span>
-      </div>
-      <div id="environmentHint" style="font-size: 0.75rem; color: #15803d; font-weight: 600;">
-        Direct ID Engine Active
-      </div>
-    </div>
+    <!-- Meeting Workspace -->
+    <main class="meeting-main">
+      
+      <!-- Video Grid Stage -->
+      <section class="stage-container" id="stageContainer">
+        
+        <!-- Video Grid -->
+        <div class="video-grid single-user" id="videoGrid">
+          
+          <!-- Local Video Tile -->
+          <div class="video-tile local-tile" id="localVideoTile">
+            <video id="localVideo" autoplay playsinline muted></video>
+            
+            <!-- Avatar Fallback when Camera is Off -->
+            <div class="avatar-fallback" id="localAvatarFallback" style="display: none;">
+              <div class="avatar-large" id="localAvatarLetter">Y</div>
+              <p class="avatar-user-label" id="localAvatarName">You</p>
+              <div class="audio-wave-anim">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
 
-    <!-- Main Workspace -->
-    <main class="main-content">
-      <!-- Left Sidebar: Dial Pad & Contacts -->
-      <aside class="sidebar">
-        <!-- Permanent Caller ID Spotlight Card -->
-        <div class="sidebar-card my-id-spotlight">
-          <div class="id-spotlight-header">
-            <span class="spotlight-badge">🟢 YOUR PERMANENT NUMBER</span>
+            <!-- Tile Overlay Tags -->
+            <div class="tile-overlay-bottom">
+              <div class="tile-user-tag">
+                <span id="localTileName">You (Presenter)</span>
+              </div>
+              <div class="tile-indicators">
+                <span class="indicator-badge" id="localMicIndicator">🎙️</span>
+                <span class="indicator-badge" id="localCamIndicator">📹</span>
+              </div>
+            </div>
           </div>
-          <div class="id-spotlight-display">
-            <span class="spotlight-icon">🆔</span>
-            <span class="spotlight-digits" id="sidebarCallerId">--- ---</span>
+
+          <!-- Remote Video Tile (Default Dynamic Template) -->
+          <div class="video-tile remote-tile" id="remoteVideoTile" style="display: none;">
+            <video id="remoteVideo" autoplay playsinline></video>
+            
+            <!-- Avatar Fallback when Remote Cam is Off -->
+            <div class="avatar-fallback" id="remoteAvatarFallback" style="display: none;">
+              <div class="avatar-large" id="remoteAvatarLetter">P</div>
+              <p class="avatar-user-label" id="remoteAvatarName">Participant</p>
+              <div class="audio-wave-anim">
+                <span></span><span></span><span></span><span></span>
+              </div>
+            </div>
+
+            <!-- Remote Overlay Tags -->
+            <div class="tile-overlay-bottom">
+              <div class="tile-user-tag">
+                <span id="remoteTileName">Participant</span>
+              </div>
+              <div class="tile-indicators">
+                <span class="indicator-badge" id="remoteMicIndicator">🎙️</span>
+              </div>
+            </div>
           </div>
-          <p class="spotlight-sub">Share this 6-digit ID with friends so they can call you directly</p>
-          <div class="spotlight-actions">
-            <button id="spotlightCopyBtn" class="btn-spotlight-copy" title="Copy your permanent ID">📋 Copy ID</button>
-            <button id="spotlightShareBtn" class="btn-spotlight-share" title="Share direct call link">🔗 Share Link</button>
-          </div>
+
         </div>
 
-        <!-- Direct Dial Card -->
-        <div class="sidebar-card dial-card">
-          <div class="card-header">
-            <h3>📞 Call by Unique ID</h3>
-            <span class="badge badge-accent">Direct Dial</span>
-          </div>
-          <p class="card-desc">
-            Enter the 6-digit Unique ID of the person you want to call.
+        <!-- Waiting For Others Card (Shown when solo in room) -->
+        <div class="waiting-card" id="waitingNoticeCard">
+          <div class="waiting-icon">✨</div>
+          <h2 class="waiting-headline">Your meeting is ready</h2>
+          <p class="waiting-desc">
+            Share this link with anyone you want to meet with. When they click, they'll be admitted immediately with zero busy drops.
           </p>
 
-          <div class="dial-input-wrap">
-            <input 
-              type="text" 
-              id="targetIdInput" 
-              placeholder="e.g. 583-912" 
-              maxlength="10" 
-              autocomplete="off"
-              spellcheck="false"
-            >
+          <div class="invite-url-box">
+            <input type="text" id="inviteUrlInput" class="invite-input" readonly value="">
+            <button id="waitingCopyLinkBtn" class="btn-copy-lg">
+              <span>📋</span> Copy Meeting Link
+            </button>
           </div>
 
-          <!-- Dual Call Buttons: Video vs Audio -->
-          <div class="dial-action-grid">
-            <button id="startVideoCallBtn" class="btn-dial btn-video">
-              <span class="btn-icon">📹</span>
-              <div class="dial-btn-text">
-                <b>Video Call</b>
-                <small>Camera & Voice</small>
-              </div>
+          <div class="quick-share-row">
+            <button id="shareWhatsAppBtn" class="btn-share-pill whatsapp">
+              <span>💬</span> Share via WhatsApp
             </button>
-
-            <button id="startAudioCallBtn" class="btn-dial btn-audio">
-              <span class="btn-icon">🎙️</span>
-              <div class="dial-btn-text">
-                <b>Audio Call</b>
-                <small>Voice Only</small>
-              </div>
+            <button id="shareEmailBtn" class="btn-share-pill email">
+              <span>✉️</span> Share via Email
             </button>
           </div>
         </div>
 
-        <!-- Active Online IDs -->
-        <div class="sidebar-card">
-          <div class="card-header">
-            <h3>👥 Active Online IDs</h3>
-            <span class="badge badge-gray" id="onlineCountBadge">0 Online</span>
-          </div>
-          <p class="card-desc">
-            Click any active ID to auto-fill and call directly:
-          </p>
-          <div class="user-list" id="usersList">
-            <div class="empty-state">No other IDs connected yet...</div>
-          </div>
+      </section>
+
+      <!-- Slide-Out Drawer: In-Meeting Chat -->
+      <aside class="side-drawer" id="chatDrawer" style="display: none;">
+        <div class="drawer-header">
+          <h3>💬 Meeting Chat</h3>
+          <button class="drawer-close-btn" id="closeChatDrawerBtn">✕</button>
         </div>
+        <div class="drawer-content chat-messages-list" id="chatMessagesList">
+          <div class="chat-empty-notice">Messages sent here are visible to everyone in the room.</div>
+        </div>
+        <form class="drawer-footer chat-form" id="chatForm">
+          <input type="text" id="chatInput" placeholder="Send a message to everyone..." autocomplete="off">
+          <button type="submit" class="btn-chat-send">Send</button>
+        </form>
+      </aside>
 
-        <!-- Dynamic Live Incoming Call Card (Real-Time Dynamic Reception) -->
-        <div class="sidebar-card live-incoming-card" id="sidebarIncomingCard">
-          <div class="card-header">
-            <h3>📥 Live Incoming Call</h3>
-            <span class="badge badge-success" id="sidebarIncomingStatusBadge">🟢 Ready</span>
-          </div>
-
-          <!-- State 1: Idle (Waiting for Calls) -->
-          <div id="sidebarIncomingIdleState" class="incoming-idle-state">
-            <div class="incoming-idle-icon">📡</div>
-            <p class="incoming-idle-title">Listening for Incoming Calls</p>
-            <p class="incoming-idle-desc">
-              When anyone calls your ID (<b id="sidebarIncomingMyIdBadge">#---</b>), their live incoming call and answer screen will appear right here dynamically!
-            </p>
-          </div>
-
-          <!-- State 2: Active Incoming Call (Ringing Right Now!) -->
-          <div id="sidebarIncomingActiveState" class="incoming-active-state" style="display: none;">
-            <div class="incoming-pulse-box">
-              <span class="incoming-ring-bell">🔔</span>
-              <div class="incoming-active-info">
-                <span class="incoming-badge-tag">INCOMING CALL RINGING...</span>
-                <h4 id="sidebarIncomingCallerId" class="incoming-active-caller">ID #---</h4>
-                <span id="sidebarIncomingCallType" class="incoming-active-type">📹 Video Call</span>
-              </div>
-            </div>
-
-            <div class="sidebar-incoming-actions">
-              <button id="sidebarAcceptCallBtn" class="btn-sidebar-answer" title="Answer Incoming Call">
-                <span class="btn-action-icon">📞</span> ANSWER
-              </button>
-              <button id="sidebarDeclineCallBtn" class="btn-sidebar-decline" title="Decline Incoming Call">
-                <span>❌</span> DECLINE
-              </button>
-            </div>
-
-            <!-- Call waiting extra options -->
-            <div id="sidebarCallWaitingActions" class="sidebar-call-waiting-grid" style="display: none;">
-              <button id="sidebarMergeCallBtn" class="btn-sidebar-merge">
-                <span>👥</span> Merge
-              </button>
-              <button id="sidebarHoldCallBtn" class="btn-sidebar-hold">
-                <span>🔀</span> Hold
-              </button>
-            </div>
-          </div>
-
-          <!-- State 3: Active Connected Call -->
-          <div id="sidebarIncomingInCallState" class="incoming-incall-state" style="display: none;">
-            <div class="incall-indicator">
-              <span class="incall-dot"></span>
-              <div>
-                <b id="sidebarInCallPeerName">Connected with ID #---</b>
-                <div id="sidebarInCallTimer" class="incall-timer">Active • 00:00</div>
-              </div>
-            </div>
-          </div>
+      <!-- Slide-Out Drawer: Participants -->
+      <aside class="side-drawer" id="participantsDrawer" style="display: none;">
+        <div class="drawer-header">
+          <h3>👥 Participants (<span id="participantsCountNumber">1</span>)</h3>
+          <button class="drawer-close-btn" id="closeParticipantsDrawerBtn">✕</button>
+        </div>
+        <div class="drawer-content participants-list" id="participantsList">
+          <!-- Dynamically populated -->
+        </div>
+        <div class="drawer-footer">
+          <button id="drawerCopyInviteBtn" class="btn-drawer-invite">
+            <span>📋</span> Copy Invite Link
+          </button>
         </div>
       </aside>
 
-      <!-- Center & Right: Video Stage -->
-      <section class="video-stage" id="videoStageArea">
-        <!-- Call Status Bar -->
-        <div class="call-status-bar" id="callStatusBar">
-          <div class="status-indicator">
-            <span class="pulse-dot"></span>
-            <span id="callStatusMessage">Ready • Enter an ID or share your ID</span>
-          </div>
-          <div class="status-actions">
-            <div class="call-type-indicator" id="callTypeIndicator" style="display: none;">
-              <span id="callTypeBadge">📹 VIDEO</span>
-            </div>
-            <div class="call-timer" id="callTimer" style="display: none;">00:00</div>
-            <button id="headerFullscreenBtn" class="btn-icon-square" title="Full Screen">
-              <span id="headerFullscreenIcon">⛶</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Active Video / Audio Grid -->
-        <div class="video-grid" id="videoGrid">
-          <!-- Local User Stream Card -->
-          <div class="video-card local-card" id="localVideoContainer">
-            <video id="localVideo" autoplay playsinline muted></video>
-            
-            <!-- Audio-only fallback representation -->
-            <div class="audio-only-avatar" id="localAudioOnlyAvatar" style="display: none;">
-              <div class="audio-ring-pulse"></div>
-              <div class="audio-id-badge" id="localAudioIdBadge">YOU</div>
-              <span>Audio Call Active</span>
-            </div>
-
-            <div class="video-overlay">
-              <span class="user-tag" id="localUserTag">ID: Your Screen</span>
-              <div class="stream-badges">
-                <span class="stream-badge" id="localMicBadge">🎙️ Mic On</span>
-                <span class="stream-badge" id="localCamBadge">📹 Cam On</span>
-              </div>
-            </div>
-
-            <!-- Interruption overlay -->
-            <div class="interruption-overlay" id="localInterruptionOverlay" style="display: none;">
-              <div class="interruption-content">
-                <span class="interruption-icon">⏸️</span>
-                <p>Call Paused / On Hold</p>
-                <small>Session active • Zero-Busy guarantee</small>
-              </div>
-            </div>
-
-            <!-- Camera Permission & Enable Prompt Overlay -->
-            <div class="camera-prompt-overlay" id="cameraPromptOverlay" style="display: none;">
-              <div class="camera-prompt-card">
-                <span class="prompt-icon">📷</span>
-                <b id="cameraPromptTitle">Camera Not Active</b>
-                <p id="cameraPromptDesc">Click below to allow browser access to your physical webcam:</p>
-                <div class="camera-prompt-actions">
-                  <button id="turnOnCameraBtn" class="btn-turn-on-cam">📷 Turn On Real Camera</button>
-                  <button id="dismissCameraPromptBtn" class="btn-dismiss-cam">Dismiss</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Remote Stream Placeholder -->
-          <div class="video-card remote-card empty-remote" id="remotePlaceholder">
-            <div class="empty-video-placeholder">
-              <div class="placeholder-icon">📞</div>
-              <h3>No Call Connected</h3>
-              <p>Share your <b>Caller ID</b> with a friend or enter their ID to call.</p>
-              <div class="feature-pills">
-                <span class="pill">✔ 0% Busy Tone</span>
-                <span class="pill">✔ Instant Ringing</span>
-                <span class="pill">✔ Call Waiting</span>
-                <span class="pill">✔ Fullscreen View</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Persistent Floating Control Bar (Mute Mic, Speaker Mute, Video, Fullscreen) -->
-        <div class="call-control-bar" id="callControlBar">
-          <!-- Mute/Unmute Mic Button -->
-          <button id="toggleMicBtn" class="control-btn" title="Mute / Unmute Your Microphone">
-            <span class="icon" id="micBtnIcon">🎤</span>
-            <span class="btn-label" id="micBtnLabel">Mute Mic</span>
-          </button>
-
-          <!-- Speaker Mute Button (Mute Other Person's Voice) -->
-          <button id="toggleSpeakerBtn" class="control-btn" title="Mute Incoming Sound (Speaker)">
-            <span class="icon" id="speakerBtnIcon">🔊</span>
-            <span class="btn-label" id="speakerBtnLabel">Sound On</span>
-          </button>
-
-          <!-- Toggle Camera Button -->
-          <button id="toggleCamBtn" class="control-btn" title="Turn Camera Off / On">
-            <span class="icon" id="camBtnIcon">📹</span>
-            <span class="btn-label" id="camBtnLabel">Video</span>
-          </button>
-
-          <!-- Fullscreen Button -->
-          <button id="toggleFullscreenBtn" class="control-btn" title="Full Screen Video">
-            <span class="icon" id="fullscreenBtnIcon">⛶</span>
-            <span class="btn-label">Full Screen</span>
-          </button>
-
-          <!-- End Call Button (Visible only when in active call) -->
-          <button id="endCallBtn" class="control-btn btn-danger" title="End Call" style="display: none;">
-            <span class="icon">🛑</span>
-            <span class="btn-label">End Call</span>
-          </button>
-        </div>
-
-        <!-- Technical Event Log -->
-        <div class="debug-panel">
-          <div class="debug-header">
-            <h4>📡 Real-time Signaling & Media Event Log</h4>
-            <button id="clearLogsBtn" class="btn-xs">Clear</button>
-          </div>
-          <div class="debug-logs" id="debugLogs">
-            <div class="log-entry log-system">[INIT] System ready in clean white theme.</div>
-          </div>
-        </div>
-      </section>
     </main>
 
-    <!-- Modal: Outgoing Call (Caller Screen - Always RINGING, Never Busy!) -->
-    <div class="modal-backdrop" id="outgoingCallModal" style="display: none;">
-      <div class="call-dialog outgoing-dialog">
-        <div class="calling-pulse">
-          <div class="pulse-ring"></div>
-          <div class="pulse-avatar" id="outgoingTargetAvatar">📞</div>
-        </div>
-        <h3 id="outgoingTargetName">Calling ID #...</h3>
-        <div class="call-badge-status" id="outgoingStatusBadge">
-          <span class="ring-icon">🔔</span> <span id="outgoingStatusText">RINGING...</span>
-        </div>
-        <p class="dialog-note" id="outgoingDialogNote">
-          Connecting call. Even if receiver is already on another call, you get <b>RINGING</b> instead of Busy!
-        </p>
-        <button id="cancelOutgoingCallBtn" class="btn-danger btn-pill">Cancel Call</button>
-      </div>
-    </div>
-
-    <!-- Top Floating Heads-Up Banner for Incoming Calls -->
-    <div class="incoming-toast-banner" id="incomingToastBanner" style="display: none;">
-      <div class="toast-content">
-        <div class="toast-avatar-ring">📞</div>
-        <div>
-          <b id="toastCallerTitle">ID #--- is calling you!</b>
-          <div id="toastCallerType" style="font-size: 0.75rem; color: #475569;">Incoming Video Call</div>
-        </div>
-      </div>
-      <div class="toast-btns">
-        <button id="toastAcceptBtn" class="btn-toast-green">📞 Answer</button>
-        <button id="toastDeclineBtn" class="btn-toast-red">❌ Decline</button>
-      </div>
-    </div>
-
-    <!-- Modal: Incoming Call (Unmissable Real Phone Incoming Screen) -->
-    <div class="modal-backdrop incoming-backdrop" id="incomingCallModal" style="display: none;">
-      <div class="call-dialog incoming-dialog">
-        <div class="incoming-header-badge" id="callWaitingNotice" style="display: none;">
-          ⚡ CALL WAITING (You are already in a call)
-        </div>
+    <!-- Bottom Floating Control Dock (Pure White Glass) -->
+    <footer class="meeting-dock-wrap">
+      <div class="dock-inner">
         
-        <div class="calling-pulse incoming-ring-pulse">
-          <div class="pulse-ring active"></div>
-          <div class="pulse-ring active ring-delay"></div>
-          <div class="pulse-avatar incoming-avatar" id="incomingCallerAvatar">📞</div>
-        </div>
+        <!-- Mic Toggle -->
+        <button id="btnToggleMic" class="dock-btn active" title="Mute/Unmute Microphone (Ctrl+D)">
+          <span class="dock-icon" id="micIconSpan">🎙️</span>
+          <span class="dock-label">Mic</span>
+        </button>
 
-        <div class="incoming-alert-tag">🔔 INCOMING CALL RINGING...</div>
-        <h2 class="incoming-caller-title" id="incomingCallerName">ID #--- IS CALLING</h2>
-        <div class="call-type-badge-incoming" id="incomingCallTypeBadge">📹 VIDEO CALL</div>
-        <p class="dialog-note" id="incomingCallSubtitle">
-          Caller is ringing on your ID. Click below to receive the call:
-        </p>
+        <!-- Camera Toggle -->
+        <button id="btnToggleCam" class="dock-btn active" title="Turn Camera On/Off (Ctrl+E)">
+          <span class="dock-icon" id="camIconSpan">📹</span>
+          <span class="dock-label">Camera</span>
+        </button>
 
-        <div class="incoming-actions">
-          <button id="acceptCallStandardBtn" class="btn-success btn-large btn-receive-pulse">
-            <span class="btn-action-icon">📞</span> RECEIVE / ANSWER CALL
-          </button>
+        <!-- Screen Share -->
+        <button id="btnToggleScreen" class="dock-btn" title="Share Screen">
+          <span class="dock-icon">🖥️</span>
+          <span class="dock-label">Share</span>
+        </button>
 
-          <div id="callWaitingButtons" class="call-waiting-button-grid" style="display: none;">
-            <button id="acceptAndMergeBtn" class="btn-info btn-large">
-              <span>👥</span> Accept & Merge (Group Call)
-            </button>
-            <button id="acceptAndHoldBtn" class="btn-warning btn-large">
-              <span>🔀</span> Accept & Hold Current Call
-            </button>
-          </div>
+        <div class="dock-divider"></div>
 
-          <button id="declineCallBtn" class="btn-danger btn-large">
-            <span>❌</span> DECLINE / REJECT
-          </button>
-        </div>
+        <!-- Copy Invite Link -->
+        <button id="btnDockCopyLink" class="dock-btn" title="Copy Meeting Invite Link">
+          <span class="dock-icon">🔗</span>
+          <span class="dock-label">Invite</span>
+        </button>
+
+        <!-- In-Meeting Chat -->
+        <button id="btnToggleChat" class="dock-btn" title="Toggle Chat">
+          <span class="dock-icon">💬</span>
+          <span class="dock-label">Chat</span>
+          <span class="dock-badge" id="chatUnreadBadge" style="display: none;">1</span>
+        </button>
+
+        <!-- Participants List -->
+        <button id="btnToggleParticipants" class="dock-btn" title="View Participants">
+          <span class="dock-icon">👥</span>
+          <span class="dock-label" id="dockParticipantsCount">1</span>
+        </button>
+
+        <div class="dock-divider"></div>
+
+        <!-- End / Leave Meeting -->
+        <button id="btnLeaveMeeting" class="dock-btn btn-leave" title="Leave Meeting">
+          <span class="dock-icon">📞</span>
+          <span class="dock-label">Leave</span>
+        </button>
+
       </div>
-    </div>
+    </footer>
 
   </div>
 
+  <!-- Zero-Busy In-Meeting Incoming Call / Participant Modal -->
+  <div class="incoming-alert-modal" id="incomingAlertModal" style="display: none;">
+    <div class="incoming-alert-card">
+      <div class="incoming-alert-icon">🔔</div>
+      <div class="incoming-alert-info">
+        <h4 id="incomingAlertTitle">Incoming Participant</h4>
+        <p id="incomingAlertDesc">Someone is requesting to join this meeting room.</p>
+      </div>
+      <div class="incoming-alert-actions">
+        <button id="btnAlertAdmit" class="btn-alert-admit">Admit & Merge</button>
+        <button id="btnAlertHold" class="btn-alert-hold">Hold</button>
+        <button id="btnAlertDecline" class="btn-alert-decline">Decline</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Name Modal -->
+  <div class="modal-backdrop" id="editNameModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Change Display Name</h3>
+        <button class="modal-close" id="closeEditNameModalBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <label for="newDisplayNameInput" class="modal-label">Your Name in Meetings</label>
+        <input type="text" id="newDisplayNameInput" class="modal-input" placeholder="e.g. Nitish Singh" maxlength="30">
+      </div>
+      <div class="modal-actions">
+        <button id="btnSaveDisplayName" class="btn-primary-modal">Save Name</button>
+        <button id="btnCancelDisplayName" class="btn-ghost-modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification -->
+  <div class="toast-notice" id="floatingToast">
+    <span class="toast-icon">✓</span>
+    <span class="toast-text" id="toastMessage">Copied to clipboard</span>
+  </div>
+
+  <!-- Socket.IO and Meeting Controller -->
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

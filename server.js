@@ -86,10 +86,15 @@ app.get('/call', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'app.html'));
 });
 
-// If root URL has a ?call= parameter, redirect directly to /app?call=...
+// Direct Meeting Room & Redirect Routes
+app.get('/room/:roomId', (req, res) => {
+  res.redirect(`/app?room=${encodeURIComponent(req.params.roomId)}`);
+});
+
 app.get('/', (req, res, next) => {
-  if (req.query.call) {
-    return res.redirect(`/app?call=${encodeURIComponent(req.query.call)}`);
+  const room = req.query.room || req.query.call;
+  if (room) {
+    return res.redirect(`/app?room=${encodeURIComponent(room)}`);
   }
   next();
 });
@@ -124,8 +129,106 @@ const activeCalls = new Map();
 // pendingCallTimeouts: callId -> timeoutHandle (35s timeout before UNAVAILABLE)
 const pendingCallTimeouts = new Map();
 
+// activeRooms: roomId -> Map(socketId -> { socketId, userName, callType, joinedAt })
+const activeRooms = new Map();
+
 io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
+
+  // Helper for leaving room cleanly
+  function handleUserLeaveRoom(sock) {
+    const roomId = sock.currentRoomId;
+    if (!roomId) return;
+
+    const roomMap = activeRooms.get(roomId);
+    if (roomMap) {
+      roomMap.delete(sock.id);
+      if (roomMap.size === 0) {
+        activeRooms.delete(roomId);
+      }
+    }
+
+    sock.to(`room:${roomId}`).emit('user-left-room', {
+      socketId: sock.id,
+      userName: sock.currentUserName || 'Participant',
+      remainingCount: roomMap ? roomMap.size : 0
+    });
+
+    sock.leave(`room:${roomId}`);
+    console.log(`[Room Leave] ${sock.currentUserName || sock.id} left room "${roomId}"`);
+    sock.currentRoomId = null;
+  }
+
+  // ==========================================
+  // ROOM-BASED HD VIDEO/AUDIO MEETING ENGINE
+  // ==========================================
+  socket.on('join-room', ({ roomId, userName, callType = 'video' }) => {
+    const cleanRoom = (roomId || 'instant-meeting').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    const userDisplayName = (userName || 'Guest User').trim();
+
+    socket.join(`room:${cleanRoom}`);
+    socket.currentRoomId = cleanRoom;
+    socket.currentUserName = userDisplayName;
+
+    let roomMap = activeRooms.get(cleanRoom);
+    if (!roomMap) {
+      roomMap = new Map();
+      activeRooms.set(cleanRoom, roomMap);
+    }
+
+    const existingUsers = Array.from(roomMap.values());
+    const selfData = {
+      socketId: socket.id,
+      userName: userDisplayName,
+      callType,
+      joinedAt: Date.now()
+    };
+    roomMap.set(socket.id, selfData);
+
+    console.log(`[Room Join] "${userDisplayName}" (${socket.id}) joined room "${cleanRoom}". Room count: ${roomMap.size}`);
+
+    // Send existing participants to the newly joined user
+    socket.emit('room-joined-success', {
+      roomId: cleanRoom,
+      participants: existingUsers,
+      self: selfData
+    });
+
+    // Notify all existing users in the room that a new participant has joined
+    socket.to(`room:${cleanRoom}`).emit('user-joined-room', {
+      roomId: cleanRoom,
+      user: selfData,
+      totalParticipants: roomMap.size
+    });
+  });
+
+  // Relay WebRTC signals (offer, answer, ICE candidates) between room participants
+  socket.on('room-signal', ({ targetSocketId, signal, type }) => {
+    if (!targetSocketId) return;
+    io.to(targetSocketId).emit('room-signal', {
+      fromSocketId: socket.id,
+      fromUserName: socket.currentUserName || 'Participant',
+      signal,
+      type
+    });
+  });
+
+  // Room In-Meeting Chat Messages
+  socket.on('room-chat-message', ({ message }) => {
+    const roomId = socket.currentRoomId;
+    if (!roomId || !message) return;
+    io.to(`room:${roomId}`).emit('room-chat-message', {
+      senderSocketId: socket.id,
+      senderName: socket.currentUserName || 'Participant',
+      message: String(message).slice(0, 500),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+  });
+
+  // Explicit Leave Room
+  socket.on('leave-room', () => {
+    handleUserLeaveRoom(socket);
+  });
 
   // 1. User Registration by Unique ID
   socket.on('register-user', ({ uniqueId }) => {
@@ -489,6 +592,9 @@ io.on('connection', (socket) => {
 
   // 9. Disconnect with Graceful Reconnection Support
   socket.on('disconnect', (reason) => {
+    // Clean up meeting room membership if applicable
+    handleUserLeaveRoom(socket);
+
     const userId = socketToUserId.get(socket.id);
     socketToUserId.delete(socket.id);
     if (!userId) return;

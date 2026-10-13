@@ -1,338 +1,281 @@
 /* ==========================================================================
-   Non-Stop Call | Landing Page Logic & Authentication Controller
+   MeetFlow / NonStop Video | Modern Client Logic & Room Controller
+   Zero ID Clutter • 1-Click Instant Meetings • Clean Authentication
    ========================================================================== */
 
 (function() {
   'use strict';
 
   // DOM Elements
-  const authModal = document.getElementById('authModal');
-  const closeAuthModalBtn = document.getElementById('closeAuthModalBtn');
-  const tabSignInBtn = document.getElementById('tabSignInBtn');
-  const tabSignUpBtn = document.getElementById('tabSignUpBtn');
-  const signInForm = document.getElementById('signInForm');
-  const signUpForm = document.getElementById('signUpForm');
+  const authPopupBackdrop = document.getElementById('authPopupBackdrop');
+  const authDismissBtn = document.getElementById('authDismissBtn');
+  const tabChoiceSignIn = document.getElementById('tabChoiceSignIn');
+  const tabChoiceSignUp = document.getElementById('tabChoiceSignUp');
+  const formSignIn = document.getElementById('formSignIn');
+  const formSignUp = document.getElementById('formSignUp');
 
-  const navAuthActions = document.getElementById('navAuthActions');
+  const navAuthButtonGroup = document.getElementById('navAuthButtonGroup');
   const navUserCapsule = document.getElementById('navUserCapsule');
-  const navUserName = document.getElementById('navUserName');
-  const navUserCallerId = document.getElementById('navUserCallerId');
-  const navLogoutBtn = document.getElementById('navLogoutBtn');
+  const navUserDisplayName = document.getElementById('navUserDisplayName');
+  const navUserLogoutBtn = document.getElementById('navUserLogoutBtn');
 
-  const btnOpenSignIn = document.getElementById('btnOpenSignIn');
-  const btnOpenSignUp = document.getElementById('btnOpenSignUp');
-  const btnHeroSignUp = document.getElementById('btnHeroSignUp');
+  const btnNavSignIn = document.getElementById('btnNavSignIn');
+  const btnNavSignUp = document.getElementById('btnNavSignUp');
+  const btnNavNewMeeting = document.getElementById('btnNavNewMeeting');
+  const btnHeroNewMeeting = document.getElementById('btnHeroNewMeeting');
+  const btnCtaNewMeeting = document.getElementById('btnCtaNewMeeting');
   const btnCtaSignUp = document.getElementById('btnCtaSignUp');
-  const btnGuestPass1 = document.getElementById('btnGuestPass1');
-  const btnGuestPass2 = document.getElementById('btnGuestPass2');
-  const btnHeroGuest = document.getElementById('btnHeroGuest');
+  const btnGuestPassSignIn = document.getElementById('btnGuestPassSignIn');
+  const btnGuestPassSignUp = document.getElementById('btnGuestPassSignUp');
 
-  const rollNumberBtn = document.getElementById('rollNumberBtn');
-  const regCallerIdInput = document.getElementById('regCallerIdInput');
+  const heroMeetingInput = document.getElementById('heroMeetingInput');
+  const btnHeroJoinMeeting = document.getElementById('btnHeroJoinMeeting');
 
-  const simDialInput = document.getElementById('simDialInput');
-  const simDialBtn = document.getElementById('simDialBtn');
-  const simAnswerBtn = document.getElementById('simAnswerBtn');
-  const simDeclineBtn = document.getElementById('simDeclineBtn');
-
-  const landingToast = document.getElementById('landingToast');
-  const toastMessage = document.getElementById('toastMessage');
+  const floatingStatusToast = document.getElementById('floatingStatusToast');
+  const statusToastText = document.getElementById('statusToastText');
 
   // Helper: Toast notification
-  function showToast(msg, duration = 3000) {
-    if (!landingToast || !toastMessage) return;
-    toastMessage.textContent = msg;
-    landingToast.classList.add('show');
+  function notify(message, duration = 3000) {
+    if (!floatingStatusToast || !statusToastText) return;
+    statusToastText.textContent = message;
+    floatingStatusToast.classList.add('visible');
     setTimeout(() => {
-      landingToast.classList.remove('show');
+      floatingStatusToast.classList.remove('visible');
     }, duration);
   }
 
-  // Helper: Generate clean 6-digit ID (e.g. "849-210")
-  function generateRandomId() {
-    const p1 = Math.floor(100 + Math.random() * 900);
-    const p2 = Math.floor(100 + Math.random() * 900);
-    return `${p1}-${p2}`;
+  // Helper: Clean Room Slug Generator (e.g. "focus-room-482")
+  function generateCleanMeetingSlug() {
+    const adjectives = ['swift', 'focus', 'bright', 'clear', 'nexus', 'pulse', 'prime', 'wave'];
+    const nouns = ['meet', 'room', 'space', 'huddle', 'sync', 'chat'];
+    const randAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randNoun = nouns[Math.floor(Math.random() * nouns.length)];
+    const randNum = Math.floor(100 + Math.random() * 900);
+    return `${randAdj}-${randNoun}-${randNum}`;
   }
 
-  // Format ID as XXX-XXX on input
-  function formatCallerIdString(val) {
-    let cleaned = val.replace(/[^0-9]/g, '');
-    if (cleaned.length > 3) {
-      cleaned = `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}`;
-    }
-    return cleaned;
-  }
-
-  // Check Login State
-  function syncUserState() {
+  // Synchronize Nav & User State
+  function syncUserSession() {
     let user = null;
     try {
-      const stored = localStorage.getItem('logged_user');
+      const stored = localStorage.getItem('meetflow_user');
       if (stored) user = JSON.parse(stored);
     } catch (e) {}
 
-    const permId = localStorage.getItem('permanent_caller_id');
-
-    if (user && user.callerId) {
-      if (navAuthActions) navAuthActions.style.display = 'none';
+    if (user && user.name) {
+      if (navAuthButtonGroup) navAuthButtonGroup.style.display = 'none';
       if (navUserCapsule) navUserCapsule.style.display = 'flex';
-      if (navUserName) navUserName.textContent = user.name || 'Caller';
-      if (navUserCallerId) navUserCallerId.textContent = `#${user.callerId}`;
+      if (navUserDisplayName) navUserDisplayName.textContent = user.name;
     } else {
-      if (navAuthActions) navAuthActions.style.display = 'flex';
+      if (navAuthButtonGroup) navAuthButtonGroup.style.display = 'flex';
       if (navUserCapsule) navUserCapsule.style.display = 'none';
     }
-
-    // Set simulator default ID
-    const simMyIdDisplay = document.getElementById('simMyIdDisplay');
-    if (simMyIdDisplay) {
-      simMyIdDisplay.textContent = permId ? `#${permId}` : '#583-912';
-    }
   }
 
-  // Open & Close Auth Modal
-  function openModal(tab = 'signin') {
-    if (!authModal) return;
-    authModal.classList.add('open');
-    switchTab(tab);
+  // Modal Open & Close
+  function openAuthPopup(mode = 'signin') {
+    if (!authPopupBackdrop) return;
+    authPopupBackdrop.classList.add('active');
+    selectAuthMode(mode);
   }
 
-  function closeModal() {
-    if (!authModal) return;
-    authModal.classList.remove('open');
+  function closeAuthPopup() {
+    if (!authPopupBackdrop) return;
+    authPopupBackdrop.classList.remove('active');
   }
 
-  function switchTab(tab) {
-    if (tab === 'signup') {
-      if (tabSignUpBtn) tabSignUpBtn.classList.add('active');
-      if (tabSignInBtn) tabSignInBtn.classList.remove('active');
-      if (signUpForm) signUpForm.style.display = 'flex';
-      if (signInForm) signInForm.style.display = 'none';
-      // Auto-populate random ID if empty
-      if (regCallerIdInput && !regCallerIdInput.value) {
-        regCallerIdInput.value = generateRandomId();
-      }
+  function selectAuthMode(mode) {
+    if (mode === 'signup') {
+      if (tabChoiceSignUp) tabChoiceSignUp.classList.add('selected');
+      if (tabChoiceSignIn) tabChoiceSignIn.classList.remove('selected');
+      if (formSignUp) formSignUp.style.display = 'flex';
+      if (formSignIn) formSignIn.style.display = 'none';
     } else {
-      if (tabSignInBtn) tabSignInBtn.classList.add('active');
-      if (tabSignUpBtn) tabSignUpBtn.classList.remove('active');
-      if (signInForm) signInForm.style.display = 'flex';
-      if (signUpForm) signUpForm.style.display = 'none';
+      if (tabChoiceSignIn) tabChoiceSignIn.classList.add('selected');
+      if (tabChoiceSignUp) tabChoiceSignUp.classList.remove('selected');
+      if (formSignIn) formSignIn.style.display = 'flex';
+      if (formSignUp) formSignUp.style.display = 'none';
     }
   }
 
-  // Event Listeners for Modal
-  if (btnOpenSignIn) btnOpenSignIn.addEventListener('click', () => openModal('signin'));
-  if (btnOpenSignUp) btnOpenSignUp.addEventListener('click', () => openModal('signup'));
-  if (btnHeroSignUp) btnHeroSignUp.addEventListener('click', () => openModal('signup'));
-  if (btnCtaSignUp) btnCtaSignUp.addEventListener('click', () => openModal('signup'));
+  // Launch New Instant Meeting
+  function launchInstantMeeting() {
+    const roomCode = generateCleanMeetingSlug();
+    notify(`🚀 Creating instant meeting "${roomCode}"...`, 1500);
 
-  if (closeAuthModalBtn) closeAuthModalBtn.addEventListener('click', closeModal);
-  if (authModal) {
-    authModal.addEventListener('click', (e) => {
-      if (e.target === authModal) closeModal();
-    });
+    // Save temporary meeting name
+    sessionStorage.setItem('current_meeting_room', roomCode);
+
+    setTimeout(() => {
+      window.location.href = `/app?call=${encodeURIComponent(roomCode)}`;
+    }, 700);
   }
 
-  if (tabSignInBtn) tabSignInBtn.addEventListener('click', () => switchTab('signin'));
-  if (tabSignUpBtn) tabSignUpBtn.addEventListener('click', () => switchTab('signup'));
+  // Join Existing Meeting Link / Code
+  function joinMeetingByCode() {
+    const raw = heroMeetingInput ? heroMeetingInput.value.trim() : '';
+    if (!raw) {
+      notify('⚠️ Please enter a meeting link or code to join.');
+      if (heroMeetingInput) heroMeetingInput.focus();
+      return;
+    }
 
-  // Roll new number button
-  if (rollNumberBtn) {
-    rollNumberBtn.addEventListener('click', () => {
-      if (regCallerIdInput) {
-        regCallerIdInput.value = generateRandomId();
-        showToast('🎲 New 6-Digit ID Generated!');
+    // Clean code if user pasted a full URL
+    let code = raw;
+    try {
+      if (raw.includes('http://') || raw.includes('https://')) {
+        const url = new URL(raw);
+        code = url.searchParams.get('call') || url.pathname.replace(/^\//, '');
       }
-    });
+    } catch (e) {}
+
+    notify(`Connecting to meeting "${code}"...`, 1500);
+    setTimeout(() => {
+      window.location.href = `/app?call=${encodeURIComponent(code)}`;
+    }, 600);
   }
 
-  if (regCallerIdInput) {
-    regCallerIdInput.addEventListener('input', (e) => {
-      e.target.value = formatCallerIdString(e.target.value);
-    });
-  }
+  // One-Click Guest Entry
+  function handleGuestQuickEntry() {
+    const guestUser = {
+      name: 'Guest Participant',
+      email: 'guest@meetflow.live'
+    };
+    localStorage.setItem('meetflow_user', JSON.stringify(guestUser));
+    notify('⚡ Entering as Guest Participant...', 1200);
 
-  // Guest Pass Handlers
-  function handleGuestPass() {
-    let id = localStorage.getItem('permanent_caller_id');
-    if (!id || id.trim().length < 3) {
-      id = generateRandomId();
-      localStorage.setItem('permanent_caller_id', id);
-    }
-    showToast(`⚡ Instant Guest Access Granted (#${id})! Redirecting...`, 1500);
     setTimeout(() => {
       window.location.href = '/app';
-    }, 900);
+    }, 700);
   }
 
-  if (btnGuestPass1) btnGuestPass1.addEventListener('click', handleGuestPass);
-  if (btnGuestPass2) btnGuestPass2.addEventListener('click', handleGuestPass);
-  if (btnHeroGuest) btnHeroGuest.addEventListener('click', handleGuestPass);
+  // Event Listeners for Nav & Buttons
+  if (btnNavSignIn) btnNavSignIn.addEventListener('click', () => openAuthPopup('signin'));
+  if (btnNavSignUp) btnNavSignUp.addEventListener('click', () => openAuthPopup('signup'));
+  if (btnCtaSignUp) btnCtaSignUp.addEventListener('click', () => openAuthPopup('signup'));
 
-  // Sign Up Submission
-  if (signUpForm) {
-    signUpForm.addEventListener('submit', async (e) => {
+  if (btnNavNewMeeting) btnNavNewMeeting.addEventListener('click', launchInstantMeeting);
+  if (btnHeroNewMeeting) btnHeroNewMeeting.addEventListener('click', launchInstantMeeting);
+  if (btnCtaNewMeeting) btnCtaNewMeeting.addEventListener('click', launchInstantMeeting);
+
+  if (btnHeroJoinMeeting) btnHeroJoinMeeting.addEventListener('click', joinMeetingByCode);
+  if (heroMeetingInput) {
+    heroMeetingInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') joinMeetingByCode();
+    });
+  }
+
+  if (authDismissBtn) authDismissBtn.addEventListener('click', closeAuthPopup);
+  if (authPopupBackdrop) {
+    authPopupBackdrop.addEventListener('click', (e) => {
+      if (e.target === authPopupBackdrop) closeAuthPopup();
+    });
+  }
+
+  if (tabChoiceSignIn) tabChoiceSignIn.addEventListener('click', () => selectAuthMode('signin'));
+  if (tabChoiceSignUp) tabChoiceSignUp.addEventListener('click', () => selectAuthMode('signup'));
+
+  if (btnGuestPassSignIn) btnGuestPassSignIn.addEventListener('click', handleGuestQuickEntry);
+  if (btnGuestPassSignUp) btnGuestPassSignUp.addEventListener('click', handleGuestQuickEntry);
+
+  // Form: Sign In
+  if (formSignIn) {
+    formSignIn.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('regNameInput').value.trim();
-      const email = document.getElementById('regEmailInput').value.trim();
-      const callerId = regCallerIdInput.value.trim();
-      const password = document.getElementById('regPassInput').value.trim();
+      const email = document.getElementById('loginEmailInput').value.trim();
+      const password = document.getElementById('loginPasswordInput').value.trim();
 
-      if (!name || !email || !callerId || !password) {
-        showToast('⚠️ Please fill in all fields.');
+      if (!email || !password) {
+        notify('⚠️ Please provide your email and password.');
         return;
       }
 
-      if (callerId.replace(/[^0-9]/g, '').length < 6) {
-        showToast('⚠️ Caller ID must contain at least 6 digits (e.g. 583-912).');
-        return;
-      }
-
-      const userData = {
-        name,
-        email,
-        callerId,
-        password
+      const user = {
+        name: email.split('@')[0],
+        email: email
       };
 
-      // Persist in localStorage
-      localStorage.setItem('logged_user', JSON.stringify({ name, email, callerId }));
-      localStorage.setItem('permanent_caller_id', callerId);
+      localStorage.setItem('meetflow_user', JSON.stringify(user));
 
-      // Attempt to save to backend API
+      // Sync backend
+      try {
+        await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: email, password })
+        });
+      } catch (err) {}
+
+      notify(`✅ Welcome back, ${user.name}! Entering meeting console...`, 1500);
+      syncUserSession();
+      closeAuthPopup();
+
+      setTimeout(() => {
+        window.location.href = '/app';
+      }, 800);
+    });
+  }
+
+  // Form: Sign Up
+  if (formSignUp) {
+    formSignUp.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('signupNameInput').value.trim();
+      const email = document.getElementById('signupEmailInput').value.trim();
+      const password = document.getElementById('signupPasswordInput').value.trim();
+
+      if (!name || !email || !password) {
+        notify('⚠️ Please fill in all fields.');
+        return;
+      }
+
+      const user = {
+        name,
+        email
+      };
+
+      localStorage.setItem('meetflow_user', JSON.stringify(user));
+
+      // Sync backend
       try {
         await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(userData)
+          body: JSON.stringify({ name, email, password, callerId: name.toLowerCase().replace(/[^a-z0-9]/g, '') })
         });
-      } catch (err) {
-        console.warn('Backend auth sync note (using local persistence):', err);
-      }
+      } catch (err) {}
 
-      showToast(`🎉 Welcome ${name}! Number #${callerId} registered. Launching app...`, 2000);
-      syncUserState();
-      closeModal();
+      notify(`🎉 Account created! Welcome, ${name}. Launching meetings...`, 1500);
+      syncUserSession();
+      closeAuthPopup();
 
       setTimeout(() => {
         window.location.href = '/app';
-      }, 1200);
+      }, 900);
     });
   }
 
-  // Sign In Submission
-  if (signInForm) {
-    signInForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const identifier = document.getElementById('loginIdInput').value.trim();
-      const password = document.getElementById('loginPassInput').value.trim();
-
-      if (!identifier || !password) {
-        showToast('⚠️ Please enter your ID or Email and Password.');
-        return;
-      }
-
-      let callerId = identifier;
-      // If entered plain digits or format
-      if (/^[0-9-]+$/.test(identifier)) {
-        callerId = formatCallerIdString(identifier);
-      }
-
-      const userData = {
-        name: 'Caller',
-        callerId: callerId,
-        email: identifier.includes('@') ? identifier : `${callerId}@nonstop.call`
-      };
-
-      // Persist in localStorage
-      localStorage.setItem('logged_user', JSON.stringify(userData));
-      localStorage.setItem('permanent_caller_id', callerId);
-
-      // Attempt to login to backend API
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier, password })
-        });
-        const data = await res.json();
-        if (data && data.user) {
-          localStorage.setItem('logged_user', JSON.stringify(data.user));
-          if (data.user.callerId) {
-            localStorage.setItem('permanent_caller_id', data.user.callerId);
-          }
-        }
-      } catch (err) {
-        console.warn('Backend login sync note:', err);
-      }
-
-      showToast(`✅ Welcome back! Launching Calling Console (#${callerId})...`, 1500);
-      syncUserState();
-      closeModal();
-
-      setTimeout(() => {
-        window.location.href = '/app';
-      }, 1000);
-    });
-  }
-
-  // Logout Handler
-  if (navLogoutBtn) {
-    navLogoutBtn.addEventListener('click', () => {
-      localStorage.removeItem('logged_user');
-      syncUserState();
-      showToast('👋 You have been logged out.');
-    });
-  }
-
-  // Simulator Dial Handler
-  if (simDialInput) {
-    simDialInput.addEventListener('input', (e) => {
-      e.target.value = formatCallerIdString(e.target.value);
-    });
-  }
-
-  if (simDialBtn) {
-    simDialBtn.addEventListener('click', () => {
-      const target = simDialInput ? simDialInput.value.trim() : '';
-      if (target) {
-        window.location.href = `/app?call=${encodeURIComponent(target)}`;
-      } else {
-        window.location.href = '/app';
-      }
-    });
-  }
-
-  if (simAnswerBtn) {
-    simAnswerBtn.addEventListener('click', () => {
-      window.location.href = '/app';
-    });
-  }
-
-  if (simDeclineBtn) {
-    simDeclineBtn.addEventListener('click', () => {
-      const card = document.querySelector('.sim-call-card');
-      if (card) {
-        card.style.opacity = '0.5';
-        setTimeout(() => { card.style.opacity = '1'; }, 1000);
-      }
-      showToast('Call declined in preview');
+  // Logout
+  if (navUserLogoutBtn) {
+    navUserLogoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('meetflow_user');
+      syncUserSession();
+      notify('👋 Logged out successfully.');
     });
   }
 
   // FAQ Accordion
-  document.querySelectorAll('.faq-question').forEach((btn) => {
+  document.querySelectorAll('.faq-toggle-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const item = btn.parentElement;
-      const isOpen = item.classList.contains('active');
-      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('active'));
+      const card = btn.parentElement;
+      const isOpen = card.classList.contains('open');
+      document.querySelectorAll('.faq-card-unit').forEach(c => c.classList.remove('open'));
       if (!isOpen) {
-        item.classList.add('active');
+        card.classList.add('open');
       }
     });
   });
 
-  // Initialize
-  syncUserState();
+  // Init
+  syncUserSession();
 })();
