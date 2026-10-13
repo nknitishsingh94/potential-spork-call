@@ -22,6 +22,78 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(express.json());
+
+// In-Memory registered users store (identifier -> { name, email, callerId, password, createdAt })
+const registeredUsers = new Map();
+
+// Authentication Endpoints
+app.post('/api/auth/register', (req, res) => {
+  const { name, email, callerId, password } = req.body || {};
+  if (!callerId) {
+    return res.status(400).json({ error: 'Caller ID is required' });
+  }
+
+  const normId = normalizeId(callerId);
+  const user = {
+    name: name || 'User',
+    email: email || '',
+    callerId: callerId,
+    normId,
+    password: password || '',
+    createdAt: new Date().toISOString()
+  };
+
+  registeredUsers.set(normId, user);
+  if (email) {
+    registeredUsers.set(email.toLowerCase(), user);
+  }
+
+  console.log(`[Auth Register] Registered user ${user.name} (#${callerId})`);
+  return res.json({ success: true, user: { name: user.name, email: user.email, callerId: user.callerId } });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { identifier, password } = req.body || {};
+  if (!identifier) {
+    return res.status(400).json({ error: 'Caller ID or Email is required' });
+  }
+
+  const lookupKey = identifier.includes('@') ? identifier.toLowerCase() : normalizeId(identifier);
+  let user = registeredUsers.get(lookupKey);
+
+  // If user wasn't registered yet, create seamless guest profile
+  if (!user) {
+    user = {
+      name: 'Caller',
+      email: identifier.includes('@') ? identifier : '',
+      callerId: identifier,
+      normId: normalizeId(identifier)
+    };
+    registeredUsers.set(normalizeId(identifier), user);
+  }
+
+  console.log(`[Auth Login] Logged in user ${user.name} (#${user.callerId})`);
+  return res.json({ success: true, user: { name: user.name, email: user.email, callerId: user.callerId } });
+});
+
+// Direct Page Routes
+app.get('/app', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
+
+app.get('/call', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app.html'));
+});
+
+// If root URL has a ?call= parameter, redirect directly to /app?call=...
+app.get('/', (req, res, next) => {
+  if (req.query.call) {
+    return res.redirect(`/app?call=${encodeURIComponent(req.query.call)}`);
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
   lastModified: false,
