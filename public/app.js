@@ -1,11 +1,11 @@
 // ===================================================================
-// CallPulse - Direct HD Audio & Video Calling with Friends Protection
+// SnapCall - Snapchat-Style HD Video Calling & Friends System
 // ===================================================================
 
 // Global State
 let socket = null;
-let currentUser = null; // { id, callerId, normCallerId, name, email, avatar, authProvider, friends }
-let myUniqueId = '';
+let currentUser = null; // { id, username, name, email, avatar, authProvider, friends }
+let myUsername = '';
 
 let localStream = null;
 let screenStream = null;
@@ -14,26 +14,22 @@ let isAudioMuted = false;
 let isVideoMuted = false;
 let isSpeakerMuted = false;
 let isSharingScreen = false;
-let isExternalInterrupted = false;
 
-// Friends & Requests State
+// Friends & Feed State
 let friendsList = [];
 let pendingReceivedList = [];
 let pendingSentList = [];
 
 // WebRTC State
-const peerConnections = new Map(); // peerUserId -> RTCPeerConnection
-const pendingIceCandidates = new Map(); // peerUserId -> Array<RTCIceCandidate>
+const peerConnections = new Map(); // peerUsername -> RTCPeerConnection
+const pendingIceCandidates = new Map(); // peerUsername -> Array<RTCIceCandidate>
 let currentCallId = null;
-let currentCallPeers = new Map();
 let pendingIncomingCall = null;
 let callDurationTimer = null;
 let callStartTime = null;
 
-// Ringing Tone Audio Synthesis (Web Audio API - guaranteed zero missing asset errors)
+// Audio Ringtone Synthesis (Web Audio API)
 let audioCtx = null;
-let ringOscillator = null;
-let ringGain = null;
 let ringInterval = null;
 
 function playRingtone() {
@@ -51,8 +47,8 @@ function playRingtone() {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
-        osc.frequency.setValueAtTime(480, audioCtx.currentTime + 0.05);
+        osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(480, audioCtx.currentTime + 0.06);
         gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
         osc.connect(gain);
@@ -61,9 +57,7 @@ function playRingtone() {
         osc.stop(audioCtx.currentTime + 1.2);
       } catch (e) {}
     }, 2500);
-  } catch (e) {
-    console.warn('Ringtone audio note:', e);
-  }
+  } catch (e) {}
 }
 
 function stopRingtone() {
@@ -73,26 +67,23 @@ function stopRingtone() {
   }
 }
 
-// Play pleasant notification chime for friend request
 function playNotificationChime() {
   try {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
-    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12); // A5
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.1);
     gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.45);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
     osc.connect(gain);
     gain.connect(audioCtx.destination);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.45);
+    osc.stop(audioCtx.currentTime + 0.4);
   } catch (e) {}
 }
 
@@ -119,116 +110,77 @@ const rtcConfig = {
 const userProfileCapsule = document.getElementById('userProfileCapsule');
 const guestAuthActions = document.getElementById('guestAuthActions');
 const headerUserName = document.getElementById('headerUserName');
-const headerUserEmail = document.getElementById('headerUserEmail');
+const headerUserHandle = document.getElementById('headerUserHandle');
 const headerUserAvatar = document.getElementById('headerUserAvatar');
 const headerUserAvatarPlaceholder = document.getElementById('headerUserAvatarPlaceholder');
-const myDisplayId = document.getElementById('myDisplayId');
-const copyIdBtn = document.getElementById('copyIdBtn');
-const shareLinkBtn = document.getElementById('shareLinkBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const openAuthModalBtn = document.getElementById('openAuthModalBtn');
 
-const networkStatusDot = document.getElementById('networkStatusDot');
-const networkStatusText = document.getElementById('networkStatusText');
+// Feed Elements
+const friendSearchInput = document.getElementById('friendSearchInput');
+const searchActionBtn = document.getElementById('searchActionBtn');
+const activeFriendsStoryList = document.getElementById('activeFriendsStoryList');
+const myStoryRing = document.getElementById('myStoryRing');
 
-// Sidebar Tabs
-const tabBtnFriends = document.getElementById('tabBtnFriends');
-const tabBtnRequests = document.getElementById('tabBtnRequests');
-const tabBtnAdd = document.getElementById('tabBtnAdd');
-const tabBtnDial = document.getElementById('tabBtnDial');
+const tabFeedFriends = document.getElementById('tabFeedFriends');
+const tabFeedRequests = document.getElementById('tabFeedRequests');
+const tabFeedAdd = document.getElementById('tabFeedAdd');
 
-const tabPaneFriends = document.getElementById('tabPaneFriends');
-const tabPaneRequests = document.getElementById('tabPaneRequests');
-const tabPaneAdd = document.getElementById('tabPaneAdd');
-const tabPaneDial = document.getElementById('tabPaneDial');
+const feedPaneFriends = document.getElementById('feedPaneFriends');
+const feedPaneRequests = document.getElementById('feedPaneRequests');
+const feedPaneAdd = document.getElementById('feedPaneAdd');
 
 const friendsCountBadge = document.getElementById('friendsCountBadge');
 const requestsCountBadge = document.getElementById('requestsCountBadge');
-const receivedCountBadge = document.getElementById('receivedCountBadge');
-const sentCountBadge = document.getElementById('sentCountBadge');
+const receivedCountLabel = document.getElementById('receivedCountLabel');
+const sentCountLabel = document.getElementById('sentCountLabel');
 
-// Friends List
 const friendsListContainer = document.getElementById('friendsListContainer');
 const friendsEmptyState = document.getElementById('friendsEmptyState');
-const refreshFriendsBtn = document.getElementById('refreshFriendsBtn');
-const emptyGoToAddFriendBtn = document.getElementById('emptyGoToAddFriendBtn');
+const btnEmptyAddFriends = document.getElementById('btnEmptyAddFriends');
 
-// Requests Lists
 const receivedRequestsList = document.getElementById('receivedRequestsList');
 const sentRequestsList = document.getElementById('sentRequestsList');
 
-// Add Friend Tab
 const addFriendInput = document.getElementById('addFriendInput');
-const searchFriendBtn = document.getElementById('searchFriendBtn');
+const sendAddSearchBtn = document.getElementById('sendAddSearchBtn');
 const searchResultCard = document.getElementById('searchResultCard');
 const resultAvatar = document.getElementById('resultAvatar');
 const resultName = document.getElementById('resultName');
-const resultEmail = document.getElementById('resultEmail');
-const resultCallerId = document.getElementById('resultCallerId');
+const resultUsername = document.getElementById('resultUsername');
 const sendRequestBtn = document.getElementById('sendRequestBtn');
 const resultStatusText = document.getElementById('resultStatusText');
 
-// Direct Dial
-const targetIdInput = document.getElementById('targetIdInput');
-const startVideoCallBtn = document.getElementById('startVideoCallBtn');
-const startAudioCallBtn = document.getElementById('startAudioCallBtn');
+// Video Stage Elements
+const immersiveVideoFrame = document.getElementById('immersiveVideoFrame');
+const remoteVideo = document.getElementById('remoteVideo');
+const stageIdleCanvas = document.getElementById('stageIdleCanvas');
+const remoteAudioOnlyAvatar = document.getElementById('remoteAudioOnlyAvatar');
+const remoteAudioAvatar = document.getElementById('remoteAudioAvatar');
+const remoteAudioName = document.getElementById('remoteAudioName');
 
-// Sidebar Live Incoming Card
-const sidebarIncomingCard = document.getElementById('sidebarIncomingCard');
-const sidebarIncomingStatusBadge = document.getElementById('sidebarIncomingStatusBadge');
-const sidebarIncomingIdleState = document.getElementById('sidebarIncomingIdleState');
-const sidebarIncomingActiveState = document.getElementById('sidebarIncomingActiveState');
-const sidebarIncomingMyIdBadge = document.getElementById('sidebarIncomingMyIdBadge');
-const sidebarIncomingCallerId = document.getElementById('sidebarIncomingCallerId');
-const sidebarIncomingCallerEmail = document.getElementById('sidebarIncomingCallerEmail');
-const sidebarIncomingCallType = document.getElementById('sidebarIncomingCallType');
-const sidebarAcceptCallBtn = document.getElementById('sidebarAcceptCallBtn');
-const sidebarDeclineCallBtn = document.getElementById('sidebarDeclineCallBtn');
-
-// Video Stage
-const stageStatusTitle = document.getElementById('stageStatusTitle');
-const stageStatusTag = document.getElementById('stageStatusTag');
-const callTypeIndicator = document.getElementById('callTypeIndicator');
-const callTypeBadge = document.getElementById('callTypeBadge');
+const videoTopHud = document.getElementById('videoTopHud');
+const hudFriendAvatar = document.getElementById('hudFriendAvatar');
+const hudFriendName = document.getElementById('hudFriendName');
 const callTimer = document.getElementById('callTimer');
 const headerFullscreenBtn = document.getElementById('headerFullscreenBtn');
 
+const pipLocalCamera = document.getElementById('pipLocalCamera');
 const localVideo = document.getElementById('localVideo');
-const localAudioOnlyAvatar = document.getElementById('localAudioOnlyAvatar');
-const localAudioIdBadge = document.getElementById('localAudioIdBadge');
-const localUserTag = document.getElementById('localUserTag');
-const localMicBadge = document.getElementById('localMicBadge');
-const localCamBadge = document.getElementById('localCamBadge');
-const localInterruptionOverlay = document.getElementById('localInterruptionOverlay');
-const cameraPromptOverlay = document.getElementById('cameraPromptOverlay');
-const turnOnCameraBtn = document.getElementById('turnOnCameraBtn');
-const dismissCameraPromptBtn = document.getElementById('dismissCameraPromptBtn');
+const localAvatarFallback = document.getElementById('localAvatarFallback');
+const localAvatarLetter = document.getElementById('localAvatarLetter');
 
-const remotePlaceholder = document.getElementById('remotePlaceholder');
-const remoteVideo = document.getElementById('remoteVideo');
-const remoteEmptyPlaceholder = document.getElementById('remoteEmptyPlaceholder');
-const remoteAudioOnlyAvatar = document.getElementById('remoteAudioOnlyAvatar');
-const remoteAudioIdBadge = document.getElementById('remoteAudioIdBadge');
-const remoteAudioName = document.getElementById('remoteAudioName');
-const remoteVideoOverlay = document.getElementById('remoteVideoOverlay');
-const remoteUserTag = document.getElementById('remoteUserTag');
-const remoteMicBadge = document.getElementById('remoteMicBadge');
-const remoteCamBadge = document.getElementById('remoteCamBadge');
-
-// Call Controls
-const callControlBar = document.getElementById('callControlBar');
+// Floating Snapchat Control Capsule
+const snapControlCapsule = document.getElementById('snapControlCapsule');
 const toggleMicBtn = document.getElementById('toggleMicBtn');
 const micBtnIcon = document.getElementById('micBtnIcon');
-const micBtnLabel = document.getElementById('micBtnLabel');
-const toggleSpeakerBtn = document.getElementById('toggleSpeakerBtn');
-const speakerBtnIcon = document.getElementById('speakerBtnIcon');
-const speakerBtnLabel = document.getElementById('speakerBtnLabel');
 const toggleCamBtn = document.getElementById('toggleCamBtn');
 const camBtnIcon = document.getElementById('camBtnIcon');
-const camBtnLabel = document.getElementById('camBtnLabel');
+const endCallBtn = document.getElementById('endCallBtn');
+const toggleSpeakerBtn = document.getElementById('toggleSpeakerBtn');
+const speakerBtnIcon = document.getElementById('speakerBtnIcon');
 const shareScreenBtn = document.getElementById('shareScreenBtn');
 const toggleFullscreenBtn = document.getElementById('toggleFullscreenBtn');
-const endCallBtn = document.getElementById('endCallBtn');
 
 const debugLogs = document.getElementById('debugLogs');
 const clearLogsBtn = document.getElementById('clearLogsBtn');
@@ -243,6 +195,7 @@ const registerForm = document.getElementById('registerForm');
 const loginEmail = document.getElementById('loginEmail');
 const loginPassword = document.getElementById('loginPassword');
 const regName = document.getElementById('regName');
+const regUsername = document.getElementById('regUsername');
 const regEmail = document.getElementById('regEmail');
 const regPassword = document.getElementById('regPassword');
 const btnLoginSubmit = document.getElementById('btnLoginSubmit');
@@ -260,33 +213,20 @@ const notFriendsAlertModal = document.getElementById('notFriendsAlertModal');
 const notFriendsAlertMsg = document.getElementById('notFriendsAlertMsg');
 const alertSendRequestBtn = document.getElementById('alertSendRequestBtn');
 const alertDismissBtn = document.getElementById('alertDismissBtn');
-let alertTargetUserQuery = '';
+let alertTargetUsername = '';
 
 const outgoingCallModal = document.getElementById('outgoingCallModal');
 const outgoingTargetAvatar = document.getElementById('outgoingTargetAvatar');
 const outgoingTargetName = document.getElementById('outgoingTargetName');
-const outgoingTargetEmail = document.getElementById('outgoingTargetEmail');
+const outgoingTargetHandle = document.getElementById('outgoingTargetHandle');
 const outgoingStatusText = document.getElementById('outgoingStatusText');
-const outgoingDialogNote = document.getElementById('outgoingDialogNote');
 const cancelOutgoingCallBtn = document.getElementById('cancelOutgoingCallBtn');
 
-const incomingToastBanner = document.getElementById('incomingToastBanner');
-const toastCallerTitle = document.getElementById('toastCallerTitle');
-const toastCallerType = document.getElementById('toastCallerType');
-const toastAcceptBtn = document.getElementById('toastAcceptBtn');
-const toastDeclineBtn = document.getElementById('toastDeclineBtn');
-
 const incomingCallModal = document.getElementById('incomingCallModal');
-const callWaitingNotice = document.getElementById('callWaitingNotice');
 const incomingCallerAvatar = document.getElementById('incomingCallerAvatar');
 const incomingCallerName = document.getElementById('incomingCallerName');
-const incomingCallerSubtext = document.getElementById('incomingCallerSubtext');
-const incomingCallTypeBadge = document.getElementById('incomingCallTypeBadge');
-const incomingCallSubtitle = document.getElementById('incomingCallSubtitle');
+const incomingCallerHandle = document.getElementById('incomingCallerHandle');
 const acceptCallStandardBtn = document.getElementById('acceptCallStandardBtn');
-const callWaitingButtons = document.getElementById('callWaitingButtons');
-const acceptAndMergeBtn = document.getElementById('acceptAndMergeBtn');
-const acceptAndHoldBtn = document.getElementById('acceptAndHoldBtn');
 const declineCallBtn = document.getElementById('declineCallBtn');
 
 // ===================================================================
@@ -310,9 +250,9 @@ if (clearLogsBtn) {
 }
 
 // ===================================================================
-// AUTHENTICATION MANAGEMENT
+// AUTHENTICATION & SESSION MANAGEMENT
 // ===================================================================
-const AUTH_STORAGE_KEY = 'callpulse_auth_user';
+const AUTH_STORAGE_KEY = 'snapcall_auth_user';
 
 function getStoredUser() {
   try {
@@ -336,10 +276,9 @@ function clearStoredUser() {
   currentUser = null;
 }
 
-function showAuthAlert(msg, type = 'error') {
+function showAuthAlert(msg) {
   if (!authAlertBox) return;
   authAlertBox.textContent = msg;
-  authAlertBox.className = `auth-alert ${type}`;
   authAlertBox.style.display = 'block';
 }
 
@@ -356,7 +295,7 @@ function closeAuthModal() {
   if (authModal) authModal.style.display = 'none';
 }
 
-// Auth Tab Switching
+// Switch tabs between Login & Sign Up
 if (authTabLogin && authTabRegister) {
   authTabLogin.addEventListener('click', () => {
     authTabLogin.classList.add('active');
@@ -375,32 +314,32 @@ if (authTabLogin && authTabRegister) {
   });
 }
 
-// Handle Email Login
+// Email/Username Login
 if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideAuthAlert();
-    const email = loginEmail.value.trim();
+    const emailOrUsername = loginEmail.value.trim();
     const password = loginPassword.value;
 
-    if (!email || !password) {
-      showAuthAlert('Please enter both email and password.');
+    if (!emailOrUsername || !password) {
+      showAuthAlert('Please enter your username/email and password.');
       return;
     }
 
     try {
       btnLoginSubmit.disabled = true;
-      btnLoginSubmit.textContent = 'Signing in...';
+      btnLoginSubmit.textContent = 'Logging in...';
 
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ emailOrUsername, password })
       });
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        showAuthAlert(data.error || 'Login failed. Please check credentials.');
+        showAuthAlert(data.error || 'Login failed.');
         return;
       }
 
@@ -408,25 +347,26 @@ if (loginForm) {
       closeAuthModal();
       initAppSession(data.user);
     } catch (err) {
-      showAuthAlert('Network error during login: ' + err.message);
+      showAuthAlert('Network error: ' + err.message);
     } finally {
       btnLoginSubmit.disabled = false;
-      btnLoginSubmit.textContent = 'Sign In with Email ➜';
+      btnLoginSubmit.textContent = 'Log In ➜';
     }
   });
 }
 
-// Handle Account Registration
+// Sign Up
 if (registerForm) {
   registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     hideAuthAlert();
     const name = regName.value.trim();
+    const username = regUsername.value.trim().toLowerCase().replace(/^@+/, '');
     const email = regEmail.value.trim();
     const password = regPassword.value;
 
-    if (!name || !email || !password) {
-      showAuthAlert('Please fill in all registration fields.');
+    if (!name || !username || !email || !password) {
+      showAuthAlert('Please fill in all fields.');
       return;
     }
 
@@ -437,7 +377,7 @@ if (registerForm) {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password })
+        body: JSON.stringify({ name, username, email, password })
       });
       const data = await res.json();
 
@@ -450,10 +390,10 @@ if (registerForm) {
       closeAuthModal();
       initAppSession(data.user);
     } catch (err) {
-      showAuthAlert('Network error during registration: ' + err.message);
+      showAuthAlert('Network error: ' + err.message);
     } finally {
       btnRegisterSubmit.disabled = false;
-      btnRegisterSubmit.textContent = 'Create Account & Get Caller ID ➜';
+      btnRegisterSubmit.textContent = 'Sign Up & Get Started ➜';
     }
   });
 }
@@ -467,14 +407,12 @@ if (btnGoogleSignIn) {
 
 if (btnQuickDemoLogin) {
   btnQuickDemoLogin.addEventListener('click', () => {
-    // Generate quick simulated Google test login
-    const demoAccounts = [
-      { name: 'Nitish Singh', email: 'nitish@gmail.com' },
-      { name: 'Alex Kumar', email: 'alex@gmail.com' },
-      { name: 'Sarah Jenkins', email: 'sarah@gmail.com' }
+    const demoOptions = [
+      { email: 'nitish@gmail.com', name: 'Nitish Singh', username: 'nitish' },
+      { email: 'alex@gmail.com', name: 'Alex Kumar', username: 'alex' }
     ];
-    const chosen = demoAccounts[Math.floor(Math.random() * demoAccounts.length)];
-    performGoogleAuth(chosen.email, chosen.name);
+    const pick = demoOptions[Math.floor(Math.random() * demoOptions.length)];
+    performGoogleAuth(pick.email, pick.name, pick.username);
   });
 }
 
@@ -489,7 +427,7 @@ if (googleConfirmBtn) {
     const email = (googleCustomEmail.value || '').trim();
     const name = (googleCustomName.value || '').trim() || email.split('@')[0];
     if (!email || !email.includes('@')) {
-      alert('Please enter a valid Google email address.');
+      alert('Please enter a valid Google email.');
       return;
     }
     if (googleChooserModal) googleChooserModal.style.display = 'none';
@@ -497,7 +435,7 @@ if (googleConfirmBtn) {
   });
 }
 
-async function performGoogleAuth(email, name, picture) {
+async function performGoogleAuth(email, name, username) {
   try {
     const res = await fetch('/api/auth/google', {
       method: 'POST',
@@ -505,7 +443,8 @@ async function performGoogleAuth(email, name, picture) {
       body: JSON.stringify({
         email,
         name,
-        picture: picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name || email)}`
+        username,
+        picture: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(username || email.split('@')[0])}`
       })
     });
     const data = await res.json();
@@ -523,17 +462,13 @@ async function performGoogleAuth(email, name, picture) {
   }
 }
 
-// Open Auth Modal from Header button
 if (openAuthModalBtn) {
-  openAuthModalBtn.addEventListener('click', () => {
-    openAuthModal();
-  });
+  openAuthModalBtn.addEventListener('click', openAuthModal);
 }
 
-// Logout handler
 if (logoutBtn) {
   logoutBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to sign out?')) {
+    if (confirm('Sign out of your SnapCall account?')) {
       clearStoredUser();
       if (socket) socket.disconnect();
       window.location.reload();
@@ -542,14 +477,13 @@ if (logoutBtn) {
 }
 
 // ===================================================================
-// SIDEBAR TABS SWITCHER
+// FEED TABS SWITCHER (FRIENDS, ADDED ME, ADD)
 // ===================================================================
-function setupTabs() {
+function setupFeedTabs() {
   const tabs = [
-    { btn: tabBtnFriends, pane: tabPaneFriends },
-    { btn: tabBtnRequests, pane: tabPaneRequests },
-    { btn: tabBtnAdd, pane: tabPaneAdd },
-    { btn: tabBtnDial, pane: tabPaneDial }
+    { btn: tabFeedFriends, pane: feedPaneFriends },
+    { btn: tabFeedRequests, pane: feedPaneRequests },
+    { btn: tabFeedAdd, pane: feedPaneAdd }
   ];
 
   tabs.forEach(t => {
@@ -565,20 +499,43 @@ function setupTabs() {
     }
   });
 
-  if (emptyGoToAddFriendBtn && tabBtnAdd) {
-    emptyGoToAddFriendBtn.addEventListener('click', () => {
-      tabBtnAdd.click();
-    });
+  if (btnEmptyAddFriends && tabFeedAdd) {
+    btnEmptyAddFriends.addEventListener('click', () => tabFeedAdd.click());
+  }
+
+  if (myStoryRing && tabFeedAdd) {
+    myStoryRing.addEventListener('click', () => tabFeedAdd.click());
   }
 }
 
 // ===================================================================
-// FRIENDS LIST RENDERING & ACTIONS
+// RENDER SNAPCHAT FRIENDS & STORIES FEED
 // ===================================================================
-function renderFriendsList() {
+function renderFriendsFeed() {
   if (!friendsListContainer) return;
   friendsListContainer.innerHTML = '';
 
+  // Update Stories row
+  if (activeFriendsStoryList) {
+    activeFriendsStoryList.innerHTML = '';
+    const onlineFriends = friendsList.filter(f => f.isOnline);
+    onlineFriends.forEach(f => {
+      const story = document.createElement('div');
+      story.className = 'story-item';
+      story.innerHTML = `
+        <div class="story-ring active-ring" title="Call @${f.username}">
+          <img src="${f.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + f.username}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">
+        </div>
+        <span class="story-label">${escapeHtml(f.name.split(' ')[0])}</span>
+      `;
+      story.addEventListener('click', () => {
+        callFriend(f.username, 'video', f);
+      });
+      activeFriendsStoryList.appendChild(story);
+    });
+  }
+
+  // Update Friends Count Badge
   if (friendsCountBadge) {
     const onlineCount = friendsList.filter(f => f.isOnline).length;
     friendsCountBadge.textContent = `${onlineCount}/${friendsList.length}`;
@@ -591,94 +548,78 @@ function renderFriendsList() {
   }
 
   friendsList.forEach(friend => {
-    const item = document.createElement('div');
-    item.className = 'friend-item-card';
+    const card = document.createElement('div');
+    card.className = 'snap-friend-card';
 
     const onlineClass = friend.inCall ? 'incall' : (friend.isOnline ? 'online' : '');
-    const statusTitle = friend.inCall ? 'In Call' : (friend.isOnline ? 'Online' : 'Offline');
+    const statusText = friend.inCall ? '📞 In Call' : (friend.isOnline ? 'Active now 🟢' : 'Offline');
 
-    item.innerHTML = `
-      <div class="friend-left-wrap">
-        <div class="friend-avatar-wrap">
-          <div class="friend-avatar-circle">${(friend.name || 'U').charAt(0).toUpperCase()}</div>
-          <span class="friend-online-dot ${onlineClass}" title="${statusTitle}"></span>
+    card.innerHTML = `
+      <div class="friend-main-info">
+        <div class="friend-bitmoji-box">
+          <img class="friend-bitmoji-img" src="${friend.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + friend.username}">
+          <span class="friend-dot ${onlineClass}"></span>
         </div>
-        <div class="friend-meta-info">
-          <span class="friend-name-text">${escapeHtml(friend.name)}</span>
-          <span class="friend-email-text">${escapeHtml(friend.email || friend.callerId)}</span>
-          <span class="friend-id-pill">ID: #${friend.callerId}</span>
+        <div class="friend-details">
+          <span class="friend-name">${escapeHtml(friend.name)}</span>
+          <span class="friend-handle">@${escapeHtml(friend.username)}</span>
+          <span class="friend-status-text">${statusText}</span>
         </div>
       </div>
-      <div class="friend-action-buttons">
-        <button class="btn-call-action btn-call-video" title="Start HD Video Call" ${!friend.isOnline ? 'title="Friend is offline (will ring when online)"' : ''}>
+      <div class="friend-call-btns">
+        <button class="btn-snap-call btn-call-cam" title="HD Video Call with @${friend.username}">
           📹
         </button>
-        <button class="btn-call-action btn-call-audio" title="Start Audio Call" ${!friend.isOnline ? 'title="Friend is offline (will ring when online)"' : ''}>
-          🎙️
+        <button class="btn-snap-call btn-call-mic" title="Audio Call with @${friend.username}">
+          📞
         </button>
-        <button class="btn-friend-more" title="Remove Friend">✕</button>
       </div>
     `;
 
-    // Action listeners
-    const videoBtn = item.querySelector('.btn-call-video');
-    const audioBtn = item.querySelector('.btn-call-audio');
-    const removeBtn = item.querySelector('.btn-friend-more');
-
-    videoBtn.addEventListener('click', () => {
-      callUser(friend.callerId, 'video', friend);
+    card.querySelector('.btn-call-cam').addEventListener('click', () => {
+      callFriend(friend.username, 'video', friend);
     });
 
-    audioBtn.addEventListener('click', () => {
-      callUser(friend.callerId, 'audio', friend);
+    card.querySelector('.btn-call-mic').addEventListener('click', () => {
+      callFriend(friend.username, 'audio', friend);
     });
 
-    removeBtn.addEventListener('click', () => {
-      if (confirm(`Remove ${friend.name} from your friends list?`)) {
-        if (socket) {
-          socket.emit('remove-friend', { friendNormId: friend.normCallerId });
-        }
-      }
-    });
-
-    friendsListContainer.appendChild(item);
+    friendsListContainer.appendChild(card);
   });
 }
 
 // ===================================================================
-// REQUESTS RENDERING & ACTIONS
+// RENDER REQUESTS (ADDED ME & SENT)
 // ===================================================================
 function renderRequests() {
-  // Received Requests
   if (receivedRequestsList) {
     receivedRequestsList.innerHTML = '';
     if (pendingReceivedList.length === 0) {
-      receivedRequestsList.innerHTML = '<div class="empty-state-sm">No incoming friend requests right now.</div>';
+      receivedRequestsList.innerHTML = '<div class="empty-requests-notice">No pending requests.</div>';
     } else {
       pendingReceivedList.forEach(req => {
         const item = document.createElement('div');
-        item.className = 'request-item-card';
+        item.className = 'request-card';
         item.innerHTML = `
-          <div class="req-meta">
-            <span class="req-name">${escapeHtml(req.name)}</span>
-            <span class="req-email">${escapeHtml(req.email || '#' + req.callerId)}</span>
+          <div class="req-user-meta">
+            <img src="${req.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + req.username}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;">
+            <div>
+              <div class="req-name">${escapeHtml(req.name)}</div>
+              <div class="req-handle">@${escapeHtml(req.username)}</div>
+            </div>
           </div>
-          <div class="request-actions-wrap">
-            <button class="btn-accept-request">Accept</button>
-            <button class="btn-reject-request">Decline</button>
+          <div class="req-actions">
+            <button class="btn-snap-accept">Accept</button>
+            <button class="btn-snap-decline">✕</button>
           </div>
         `;
 
-        item.querySelector('.btn-accept-request').addEventListener('click', () => {
-          if (socket) {
-            socket.emit('accept-friend-request', { senderNormId: req.normCallerId });
-          }
+        item.querySelector('.btn-snap-accept').addEventListener('click', () => {
+          if (socket) socket.emit('accept-friend-request', { senderUsername: req.username });
         });
 
-        item.querySelector('.btn-reject-request').addEventListener('click', () => {
-          if (socket) {
-            socket.emit('reject-friend-request', { senderNormId: req.normCallerId });
-          }
+        item.querySelector('.btn-snap-decline').addEventListener('click', () => {
+          if (socket) socket.emit('reject-friend-request', { senderUsername: req.username });
         });
 
         receivedRequestsList.appendChild(item);
@@ -686,37 +627,28 @@ function renderRequests() {
     }
   }
 
-  // Sent Requests
   if (sentRequestsList) {
     sentRequestsList.innerHTML = '';
     if (pendingSentList.length === 0) {
-      sentRequestsList.innerHTML = '<div class="empty-state-sm">No pending sent requests.</div>';
+      sentRequestsList.innerHTML = '<div class="empty-requests-notice">No sent requests.</div>';
     } else {
       pendingSentList.forEach(req => {
         const item = document.createElement('div');
-        item.className = 'request-item-card';
+        item.className = 'request-card';
         item.innerHTML = `
-          <div class="req-meta">
-            <span class="req-name">${escapeHtml(req.name)}</span>
-            <span class="req-email">Awaiting response...</span>
-          </div>
-          <div class="request-actions-wrap">
-            <button class="btn-reject-request" title="Cancel request">Cancel</button>
+          <div class="req-user-meta">
+            <div>
+              <div class="req-name">${escapeHtml(req.name)}</div>
+              <div class="req-handle">@${escapeHtml(req.username)} • Pending</div>
+            </div>
           </div>
         `;
-
-        item.querySelector('.btn-reject-request').addEventListener('click', () => {
-          if (socket) {
-            socket.emit('cancel-friend-request', { targetNormId: req.normCallerId });
-          }
-        });
-
         sentRequestsList.appendChild(item);
       });
     }
   }
 
-  // Update request count badges
+  // Count badges
   const totalPending = pendingReceivedList.length;
   if (requestsCountBadge) {
     if (totalPending > 0) {
@@ -726,31 +658,37 @@ function renderRequests() {
       requestsCountBadge.style.display = 'none';
     }
   }
-  if (receivedCountBadge) receivedCountBadge.textContent = `${pendingReceivedList.length} Pending`;
-  if (sentCountBadge) sentCountBadge.textContent = `${pendingSentList.length} Sent`;
+  if (receivedCountLabel) receivedCountLabel.textContent = `${pendingReceivedList.length} pending`;
+  if (sentCountLabel) sentCountLabel.textContent = `${pendingSentList.length} sent`;
 }
 
 // ===================================================================
-// ADD FRIEND SEARCH & ACTIONS
+// ADD FRIEND SEARCH & ACTION
 // ===================================================================
-let activeSearchResult = null;
-
-if (searchFriendBtn && addFriendInput) {
-  searchFriendBtn.addEventListener('click', executeFriendSearch);
+if (sendAddSearchBtn && addFriendInput) {
+  sendAddSearchBtn.addEventListener('click', executeFriendSearch);
   addFriendInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') executeFriendSearch();
   });
 }
 
+if (friendSearchInput && searchActionBtn) {
+  searchActionBtn.addEventListener('click', () => {
+    if (addFriendInput) addFriendInput.value = friendSearchInput.value;
+    if (tabFeedAdd) tabFeedAdd.click();
+    executeFriendSearch();
+  });
+}
+
 async function executeFriendSearch() {
-  const query = addFriendInput.value.trim();
+  const query = (addFriendInput.value || '').trim();
   if (!query) return;
 
   try {
-    searchFriendBtn.disabled = true;
-    searchFriendBtn.textContent = 'Searching...';
+    sendAddSearchBtn.disabled = true;
+    sendAddSearchBtn.textContent = 'Searching...';
 
-    const res = await fetch(`/api/user/search?q=${encodeURIComponent(query)}&requesterId=${encodeURIComponent(myUniqueId)}`);
+    const res = await fetch(`/api/user/search?q=${encodeURIComponent(query)}&requester=${encodeURIComponent(myUsername)}`);
     const data = await res.json();
 
     if (!data || !data.user) {
@@ -758,36 +696,33 @@ async function executeFriendSearch() {
         searchResultCard.style.display = 'block';
         resultAvatar.textContent = '❓';
         resultName.textContent = 'User Not Found';
-        resultEmail.textContent = 'No account exists with this email or ID.';
-        resultCallerId.textContent = '';
+        resultUsername.textContent = 'No SnapCall account found';
         sendRequestBtn.style.display = 'none';
         resultStatusText.style.display = 'block';
-        resultStatusText.textContent = 'Make sure the user has created an account on CallPulse!';
+        resultStatusText.textContent = 'Make sure the user has created an account on SnapCall!';
         resultStatusText.style.color = '#ef4444';
       }
       return;
     }
 
-    activeSearchResult = data;
-    renderSearchResultCard(data);
+    renderSearchResult(data);
   } catch (err) {
     alert('Search error: ' + err.message);
   } finally {
-    searchFriendBtn.disabled = false;
-    searchFriendBtn.textContent = 'Search 🔍';
+    sendAddSearchBtn.disabled = false;
+    sendAddSearchBtn.textContent = 'Add ➕';
   }
 }
 
-function renderSearchResultCard(data) {
+function renderSearchResult(data) {
   if (!searchResultCard) return;
   const user = data.user;
   const relation = data.relation;
 
   searchResultCard.style.display = 'block';
-  resultAvatar.textContent = (user.name || 'U').charAt(0).toUpperCase();
+  resultAvatar.innerHTML = `<img src="${user.avatar || 'https://api.dicebear.com/7.x/adventurer/svg?seed=' + user.username}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
   resultName.textContent = user.name;
-  resultEmail.textContent = user.email || 'No email provided';
-  resultCallerId.textContent = `Caller ID: #${user.callerId}`;
+  resultUsername.textContent = `@${user.username}`;
 
   resultStatusText.style.display = 'none';
   sendRequestBtn.style.display = 'block';
@@ -795,44 +730,38 @@ function renderSearchResultCard(data) {
 
   if (relation === 'self') {
     sendRequestBtn.disabled = true;
-    sendRequestBtn.textContent = 'This is your own account';
+    sendRequestBtn.textContent = 'You';
   } else if (relation === 'friends') {
     sendRequestBtn.disabled = true;
-    sendRequestBtn.textContent = '✔ Already in Friends List';
+    sendRequestBtn.textContent = '✔ Already Friends';
   } else if (relation === 'pending_sent') {
     sendRequestBtn.disabled = true;
-    sendRequestBtn.textContent = '⏳ Friend Request Pending';
+    sendRequestBtn.textContent = '⏳ Request Pending';
   } else if (relation === 'pending_received') {
-    sendRequestBtn.textContent = '✔ Accept Received Request';
+    sendRequestBtn.textContent = '✔ Accept Request';
     sendRequestBtn.onclick = () => {
-      if (socket) socket.emit('accept-friend-request', { senderNormId: user.normCallerId });
+      if (socket) socket.emit('accept-friend-request', { senderUsername: user.username });
       searchResultCard.style.display = 'none';
     };
     return;
   } else {
-    sendRequestBtn.textContent = '➕ Send Friend Request';
+    sendRequestBtn.textContent = '➕ Add Friend';
   }
 
   sendRequestBtn.onclick = () => {
     if (!socket) return;
     sendRequestBtn.disabled = true;
     sendRequestBtn.textContent = 'Sending...';
-    socket.emit('send-friend-request', { targetQuery: user.callerId });
+    socket.emit('send-friend-request', { targetQuery: user.username });
   };
 }
 
-if (refreshFriendsBtn) {
-  refreshFriendsBtn.addEventListener('click', () => {
-    if (socket) socket.emit('get-friends-data');
-  });
-}
-
 // ===================================================================
-// NOT-FRIENDS BLOCK ALERT DIALOG
+// NOT-FRIENDS ALERT
 // ===================================================================
-function showNotFriendsAlert(msg, query) {
-  alertTargetUserQuery = query || '';
-  if (notFriendsAlertMsg) notFriendsAlertMsg.textContent = msg || 'You can only call accepted friends.';
+function showNotFriendsAlert(msg, targetUname) {
+  alertTargetUsername = targetUname || '';
+  if (notFriendsAlertMsg) notFriendsAlertMsg.textContent = msg || 'You must be friends to call on SnapCall.';
   if (notFriendsAlertModal) notFriendsAlertModal.style.display = 'flex';
 }
 
@@ -845,68 +774,65 @@ if (alertDismissBtn) {
 if (alertSendRequestBtn) {
   alertSendRequestBtn.addEventListener('click', () => {
     if (notFriendsAlertModal) notFriendsAlertModal.style.display = 'none';
-    if (alertTargetUserQuery) {
-      if (socket) {
-        socket.emit('send-friend-request', { targetQuery: alertTargetUserQuery });
-      }
-      if (tabBtnAdd) tabBtnAdd.click();
+    if (alertTargetUsername && socket) {
+      socket.emit('send-friend-request', { targetQuery: alertTargetUsername });
+      if (tabFeedAdd) tabFeedAdd.click();
     }
   });
 }
 
 // ===================================================================
-// WEBRTC CALLING ENGINE
+// SNAPCHAT-STYLE VIDEO CALLING ENGINE
 // ===================================================================
-function callUser(targetId, type = 'video', friendObj = null) {
-  if (!targetId || targetId.trim().length === 0) {
-    alert('Please enter a valid Caller ID.');
-    return;
-  }
+function callFriend(targetUsername, type = 'video', friendObj = null) {
+  const cleanTarget = targetUsername.trim().toLowerCase().replace(/^@+/, '');
+  if (!cleanTarget) return;
 
-  const cleanTarget = targetId.trim();
-  const normTarget = cleanTarget.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  const normSelf = myUniqueId.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-
-  if (normTarget === normSelf) {
-    alert('You cannot call your own Caller ID!');
+  if (cleanTarget === myUsername.toLowerCase()) {
+    alert('You cannot video call yourself.');
     return;
   }
 
   // Client-side Friend Verification
-  const isFriend = friendsList.some(f => f.normCallerId === normTarget);
+  const isFriend = friendsList.some(f => f.username.toLowerCase() === cleanTarget);
   if (!isFriend && !friendObj) {
     showNotFriendsAlert(
-      `ID #${cleanTarget} is not in your accepted friends list. Only accepted friends can call each other. Send a friend request first!`,
+      `@${cleanTarget} is not on your friends list. You can only call friends! Add them first.`,
       cleanTarget
     );
     return;
   }
 
   activeCallType = type;
-  addLog(`Initiating ${type.toUpperCase()} call to ID #${cleanTarget}...`, 'signal');
+  addLog(`Starting ${type.toUpperCase()} call to @${cleanTarget}...`, 'signal');
 
-  // Open Outgoing Call Modal immediately
+  // Open Outgoing Call Overlay
   if (outgoingTargetName) {
-    outgoingTargetName.textContent = friendObj ? friendObj.name : `Calling ID #${cleanTarget}`;
+    outgoingTargetName.textContent = friendObj ? friendObj.name : `Calling @${cleanTarget}`;
   }
-  if (outgoingTargetEmail) {
-    outgoingTargetEmail.textContent = friendObj ? (friendObj.email || '#' + friendObj.callerId) : `#${cleanTarget}`;
+  if (outgoingTargetHandle) {
+    outgoingTargetHandle.textContent = `@${cleanTarget}`;
   }
-  if (outgoingStatusText) outgoingStatusText.textContent = 'CONNECTING...';
+  if (outgoingTargetAvatar) {
+    if (friendObj && friendObj.avatar) {
+      outgoingTargetAvatar.innerHTML = `<img src="${friendObj.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    } else {
+      outgoingTargetAvatar.textContent = '👻';
+    }
+  }
+  if (outgoingStatusText) outgoingStatusText.textContent = 'RINGING... 🔔';
   if (outgoingCallModal) outgoingCallModal.style.display = 'flex';
 
   playRingtone();
 
-  // Emit initiate-call to server
   if (socket) {
     socket.emit('initiate-call', {
-      targetId: cleanTarget,
+      targetUsername: cleanTarget,
       callType: type
     });
   }
 }
 
-// Cancel Outgoing Call
 if (cancelOutgoingCallBtn) {
   cancelOutgoingCallBtn.addEventListener('click', () => {
     stopRingtone();
@@ -925,124 +851,66 @@ function closeOutgoingModal() {
 // ===================================================================
 // INCOMING CALL HANDLING
 // ===================================================================
-function handleIncomingCallNotification(data) {
+function handleIncomingCall(data) {
   pendingIncomingCall = data;
   playRingtone();
 
-  const callerDisplayName = data.callerName || `Caller #${data.callerId}`;
-
-  // Update Modal
-  if (incomingCallerName) incomingCallerName.textContent = callerDisplayName.toUpperCase();
-  if (incomingCallerSubtext) {
-    incomingCallerSubtext.textContent = `${data.callerEmail ? data.callerEmail + ' • ' : ''}ID #${data.callerId}`;
-  }
-  if (incomingCallTypeBadge) {
-    incomingCallTypeBadge.textContent = data.callType === 'video' ? '📹 VIDEO CALL' : '🎙️ AUDIO CALL';
-  }
-
-  if (data.isCallWaiting) {
-    if (callWaitingNotice) callWaitingNotice.style.display = 'block';
-    if (callWaitingButtons) callWaitingButtons.style.display = 'grid';
-    if (acceptCallStandardBtn) acceptCallStandardBtn.style.display = 'none';
-  } else {
-    if (callWaitingNotice) callWaitingNotice.style.display = 'none';
-    if (callWaitingButtons) callWaitingButtons.style.display = 'none';
-    if (acceptCallStandardBtn) acceptCallStandardBtn.style.display = 'flex';
+  if (incomingCallerName) incomingCallerName.textContent = data.callerName || `@${data.callerUsername}`;
+  if (incomingCallerHandle) incomingCallerHandle.textContent = `@${data.callerUsername}`;
+  if (incomingCallerAvatar) {
+    if (data.callerAvatar) {
+      incomingCallerAvatar.innerHTML = `<img src="${data.callerAvatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    } else {
+      incomingCallerAvatar.textContent = '👻';
+    }
   }
 
   if (incomingCallModal) incomingCallModal.style.display = 'flex';
-
-  // Update Floating Toast Banner
-  if (toastCallerTitle) toastCallerTitle.textContent = `${callerDisplayName} is calling!`;
-  if (toastCallerType) toastCallerType.textContent = `Incoming ${data.callType === 'video' ? 'Video' : 'Audio'} Call`;
-  if (incomingToastBanner) incomingToastBanner.style.display = 'flex';
-
-  // Update Sidebar Card
-  if (sidebarIncomingCallerId) sidebarIncomingCallerId.textContent = callerDisplayName;
-  if (sidebarIncomingCallerEmail) sidebarIncomingCallerEmail.textContent = data.callerEmail || `#${data.callerId}`;
-  if (sidebarIncomingCallType) sidebarIncomingCallType.textContent = data.callType === 'video' ? '📹 Video Call' : '🎙️ Audio Call';
-  if (sidebarIncomingIdleState) sidebarIncomingIdleState.style.display = 'none';
-  if (sidebarIncomingActiveState) sidebarIncomingActiveState.style.display = 'block';
 }
 
 function closeIncomingModal() {
   stopRingtone();
   pendingIncomingCall = null;
   if (incomingCallModal) incomingCallModal.style.display = 'none';
-  if (incomingToastBanner) incomingToastBanner.style.display = 'none';
-
-  if (sidebarIncomingIdleState) sidebarIncomingIdleState.style.display = 'block';
-  if (sidebarIncomingActiveState) sidebarIncomingActiveState.style.display = 'none';
 }
 
-// Accept & Decline Listeners
 if (acceptCallStandardBtn) {
-  acceptCallStandardBtn.addEventListener('click', () => acceptIncomingCall('standard'));
-}
-if (toastAcceptBtn) {
-  toastAcceptBtn.addEventListener('click', () => acceptIncomingCall('standard'));
-}
-if (sidebarAcceptCallBtn) {
-  sidebarAcceptCallBtn.addEventListener('click', () => acceptIncomingCall('standard'));
-}
-
-if (acceptAndMergeBtn) {
-  acceptAndMergeBtn.addEventListener('click', () => acceptIncomingCall('merge'));
-}
-if (acceptAndHoldBtn) {
-  acceptAndHoldBtn.addEventListener('click', () => acceptIncomingCall('hold'));
+  acceptCallStandardBtn.addEventListener('click', () => {
+    if (!pendingIncomingCall || !socket) return;
+    const callId = pendingIncomingCall.callId;
+    closeIncomingModal();
+    addLog('Connecting call...', 'signal');
+    socket.emit('accept-call', { callId });
+  });
 }
 
 if (declineCallBtn) {
-  declineCallBtn.addEventListener('click', declineIncomingCall);
-}
-if (toastDeclineBtn) {
-  toastDeclineBtn.addEventListener('click', declineIncomingCall);
-}
-if (sidebarDeclineCallBtn) {
-  sidebarDeclineCallBtn.addEventListener('click', declineIncomingCall);
-}
-
-function acceptIncomingCall(mode = 'standard') {
-  if (!pendingIncomingCall || !socket) return;
-  const callId = pendingIncomingCall.callId;
-  const callType = pendingIncomingCall.callType;
-  closeIncomingModal();
-
-  addLog(`Answering incoming call (${mode.toUpperCase()})...`, 'signal');
-  socket.emit('accept-call', { callId, mode });
-}
-
-function declineIncomingCall() {
-  if (!pendingIncomingCall || !socket) return;
-  const callId = pendingIncomingCall.callId;
-  closeIncomingModal();
-
-  addLog('Call declined by receiver.', 'info');
-  socket.emit('reject-call', { callId });
+  declineCallBtn.addEventListener('click', () => {
+    if (!pendingIncomingCall || !socket) return;
+    const callId = pendingIncomingCall.callId;
+    closeIncomingModal();
+    addLog('Call declined.', 'info');
+    socket.emit('reject-call', { callId });
+  });
 }
 
 // ===================================================================
-// PHYSICAL CAMERA & AUDIO MEDIA CORE
+// PHYSICAL CAMERA & PIP ACQUISITION
 // ===================================================================
 async function acquirePhysicalMedia(preferAudioOnly = false) {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    throw new Error('CAMERA_NOT_SUPPORTED_OR_INSECURE_CONTEXT');
+    throw new Error('CAMERA_NOT_SUPPORTED');
   }
 
   if (preferAudioOnly) {
     return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
   }
 
-  // Release any existing stream tracks BEFORE acquiring new hardware access
   if (localStream) {
-    try {
-      localStream.getTracks().forEach(t => t.stop());
-    } catch (e) {}
+    try { localStream.getTracks().forEach(t => t.stop()); } catch (e) {}
     localStream = null;
   }
 
-  // Stage 1: Standard HD Camera + Audio
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -1051,13 +919,11 @@ async function acquirePhysicalMedia(preferAudioOnly = false) {
     if (stream && stream.getVideoTracks().length > 0) return stream;
   } catch (e1) {}
 
-  // Stage 2: Basic Video + Audio
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     if (stream && stream.getVideoTracks().length > 0) return stream;
   } catch (e2) {}
 
-  // Stage 3: Audio fallback
   return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 }
 
@@ -1070,45 +936,42 @@ async function initLocalMedia(callType = 'video') {
     }
 
     if (callType === 'audio' || localStream.getVideoTracks().length === 0) {
-      if (localAudioOnlyAvatar) localAudioOnlyAvatar.style.display = 'flex';
+      if (localAvatarFallback) localAvatarFallback.style.display = 'flex';
       if (localVideo) localVideo.style.display = 'none';
     } else {
-      if (localAudioOnlyAvatar) localAudioOnlyAvatar.style.display = 'none';
+      if (localAvatarFallback) localAvatarFallback.style.display = 'none';
       if (localVideo) localVideo.style.display = 'block';
     }
   } catch (err) {
-    addLog(`Media initialization note: ${err.message}`, 'warning');
+    addLog(`Media note: ${err.message}`, 'warning');
   }
 }
 
 // ===================================================================
-// WEBRTC PEER CONNECTION MANAGEMENT
+// WEBRTC PEER CONNECTIONS
 // ===================================================================
-async function getOrCreatePeerConnection(peerUserId) {
-  if (peerConnections.has(peerUserId)) {
-    return peerConnections.get(peerUserId);
+async function getOrCreatePeerConnection(peerUsername) {
+  if (peerConnections.has(peerUsername)) {
+    return peerConnections.get(peerUsername);
   }
 
   const pc = new RTCPeerConnection(rtcConfig);
-  peerConnections.set(peerUserId, pc);
+  peerConnections.set(peerUsername, pc);
 
-  // Add local tracks to peer connection
   if (localStream) {
     localStream.getTracks().forEach(track => {
       pc.addTrack(track, localStream);
     });
   }
 
-  // Remote stream received
   pc.ontrack = (event) => {
-    addLog(`[WebRTC] Received remote stream track: ${event.track.kind}`, 'signal');
+    addLog(`[WebRTC] Remote stream track connected: ${event.track.kind}`, 'signal');
     if (remoteVideo) {
       remoteVideo.srcObject = event.streams[0];
       remoteVideo.style.display = 'block';
       remoteVideo.play().catch(() => {});
     }
-    if (remoteEmptyPlaceholder) remoteEmptyPlaceholder.style.display = 'none';
-    if (remoteVideoOverlay) remoteVideoOverlay.style.display = 'flex';
+    if (stageIdleCanvas) stageIdleCanvas.style.display = 'none';
 
     if (activeCallType === 'audio') {
       if (remoteAudioOnlyAvatar) remoteAudioOnlyAvatar.style.display = 'flex';
@@ -1116,11 +979,10 @@ async function getOrCreatePeerConnection(peerUserId) {
     }
   };
 
-  // ICE candidates
   pc.onicecandidate = (event) => {
     if (event.candidate && socket) {
       socket.emit('ice-candidate', {
-        targetUserId: peerUserId,
+        targetUsername: peerUsername,
         candidate: event.candidate,
         callId: currentCallId
       });
@@ -1130,15 +992,15 @@ async function getOrCreatePeerConnection(peerUserId) {
   return pc;
 }
 
-async function initiatePeerConnection(peerUserId, peerDisplayId, isCaller = false) {
-  const pc = await getOrCreatePeerConnection(peerUserId);
+async function initiatePeerConnection(peerUsername, isCaller = false) {
+  const pc = await getOrCreatePeerConnection(peerUsername);
 
   if (isCaller) {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     if (socket) {
       socket.emit('webrtc-offer', {
-        targetUserId: peerUserId,
+        targetUsername: peerUsername,
         offer,
         callId: currentCallId
       });
@@ -1146,11 +1008,10 @@ async function initiatePeerConnection(peerUserId, peerDisplayId, isCaller = fals
   }
 }
 
-// Drain queued ICE candidates
-async function processPendingIceCandidates(peerId, pc) {
-  if (!pendingIceCandidates.has(peerId) || !pc || !pc.remoteDescription) return;
-  const queue = pendingIceCandidates.get(peerId);
-  pendingIceCandidates.delete(peerId);
+async function processPendingIceCandidates(peerUname, pc) {
+  if (!pendingIceCandidates.has(peerUname) || !pc || !pc.remoteDescription) return;
+  const queue = pendingIceCandidates.get(peerUname);
+  pendingIceCandidates.delete(peerUname);
   for (const candidate of queue) {
     try {
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -1159,27 +1020,27 @@ async function processPendingIceCandidates(peerId, pc) {
 }
 
 // ===================================================================
-// ACTIVE CALL WORKSPACE UI & TIMER
+// ACTIVE CALL UI & HUD
 // ===================================================================
-function startCallSessionUI(participants, callType) {
-  if (stageStatusTitle) stageStatusTitle.textContent = 'Active Call';
-  if (stageStatusTag) {
-    stageStatusTag.textContent = 'In Call';
-    stageStatusTag.style.background = '#dcfce7';
-    stageStatusTag.style.color = '#15803d';
+function startCallSessionUI(peerInfo, callType) {
+  if (stageIdleCanvas) stageIdleCanvas.style.display = 'none';
+  if (videoTopHud) videoTopHud.style.display = 'flex';
+  if (hudFriendName) hudFriendName.textContent = peerInfo?.name || `@${peerInfo?.username}`;
+  if (hudFriendAvatar) {
+    if (peerInfo?.avatar) {
+      hudFriendAvatar.innerHTML = `<img src="${peerInfo.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+    } else {
+      hudFriendAvatar.textContent = '👤';
+    }
   }
-  if (callTypeIndicator) callTypeIndicator.style.display = 'block';
-  if (callTypeBadge) callTypeBadge.textContent = callType === 'video' ? '📹 VIDEO' : '🎙️ AUDIO';
-  if (callTimer) callTimer.style.display = 'block';
-  if (endCallBtn) endCallBtn.style.display = 'flex';
 
-  // Start Duration Timer
+  // Duration Timer
   callStartTime = Date.now();
   if (callDurationTimer) clearInterval(callDurationTimer);
   callDurationTimer = setInterval(() => {
-    const elapsedSec = Math.floor((Date.now() - callStartTime) / 1000);
-    const m = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
-    const s = String(elapsedSec % 60).padStart(2, '0');
+    const sec = Math.floor((Date.now() - callStartTime) / 1000);
+    const m = String(Math.floor(sec / 60)).padStart(2, '0');
+    const s = String(sec % 60).padStart(2, '0');
     if (callTimer) callTimer.textContent = `${m}:${s}`;
   }, 1000);
 
@@ -1192,115 +1053,81 @@ function endCurrentCallLocal(emitToServer = true) {
     callDurationTimer = null;
   }
 
-  // Close peer connections
   peerConnections.forEach(pc => {
     try { pc.close(); } catch (e) {}
   });
   peerConnections.clear();
   pendingIceCandidates.clear();
 
-  // Reset Video Stage
   if (remoteVideo) {
     remoteVideo.srcObject = null;
     remoteVideo.style.display = 'none';
   }
-  if (remoteEmptyPlaceholder) remoteEmptyPlaceholder.style.display = 'flex';
+  if (stageIdleCanvas) stageIdleCanvas.style.display = 'block';
   if (remoteAudioOnlyAvatar) remoteAudioOnlyAvatar.style.display = 'none';
-  if (remoteVideoOverlay) remoteVideoOverlay.style.display = 'none';
-
-  if (stageStatusTitle) stageStatusTitle.textContent = 'Ready to Call';
-  if (stageStatusTag) {
-    stageStatusTag.textContent = 'Idle';
-    stageStatusTag.style.background = '';
-    stageStatusTag.style.color = '';
-  }
-  if (callTypeIndicator) callTypeIndicator.style.display = 'none';
-  if (callTimer) {
-    callTimer.style.display = 'none';
-    callTimer.textContent = '00:00';
-  }
-  if (endCallBtn) endCallBtn.style.display = 'none';
+  if (videoTopHud) videoTopHud.style.display = 'none';
+  if (callTimer) callTimer.textContent = '00:00';
 
   if (emitToServer && socket && currentCallId) {
     socket.emit('end-call', { callId: currentCallId });
   }
   currentCallId = null;
-  addLog('Call session ended.', 'info');
+  addLog('Video call ended.', 'info');
 }
 
-// Call Control Listeners
+// Call Control Buttons
 if (endCallBtn) {
-  endCallBtn.addEventListener('click', () => {
-    endCurrentCallLocal(true);
-  });
+  endCallBtn.addEventListener('click', () => endCurrentCallLocal(true));
 }
 
-// Mic Mute
 if (toggleMicBtn) {
   toggleMicBtn.addEventListener('click', () => {
     if (!localStream) return;
     isAudioMuted = !isAudioMuted;
     localStream.getAudioTracks().forEach(t => { t.enabled = !isAudioMuted; });
-
     micBtnIcon.textContent = isAudioMuted ? '🔇' : '🎤';
-    micBtnLabel.textContent = isAudioMuted ? 'Unmute' : 'Mute Mic';
-    toggleMicBtn.style.background = isAudioMuted ? '#fee2e2' : '';
-    localMicBadge.textContent = isAudioMuted ? '🔇 Mic Off' : '🎙️ Mic On';
-
-    if (socket) {
-      socket.emit('peer-media-state', { isAudioMuted, isVideoMuted });
-    }
+    toggleMicBtn.style.background = isAudioMuted ? 'rgba(239, 68, 68, 0.4)' : '';
+    if (socket) socket.emit('peer-media-state', { isAudioMuted, isVideoMuted });
   });
 }
 
-// Camera Toggle
 if (toggleCamBtn) {
   toggleCamBtn.addEventListener('click', () => {
     if (!localStream) return;
     isVideoMuted = !isVideoMuted;
     localStream.getVideoTracks().forEach(t => { t.enabled = !isVideoMuted; });
-
     camBtnIcon.textContent = isVideoMuted ? '🚫' : '📹';
-    camBtnLabel.textContent = isVideoMuted ? 'Camera Off' : 'Video';
-    localCamBadge.textContent = isVideoMuted ? '🚫 Cam Off' : '📹 Cam On';
-    if (localAudioOnlyAvatar) localAudioOnlyAvatar.style.display = isVideoMuted ? 'flex' : 'none';
+    toggleCamBtn.style.background = isVideoMuted ? 'rgba(239, 68, 68, 0.4)' : '';
+    if (localAvatarFallback) localAvatarFallback.style.display = isVideoMuted ? 'flex' : 'none';
     if (localVideo) localVideo.style.display = isVideoMuted ? 'none' : 'block';
   });
 }
 
-// Speaker Mute
 if (toggleSpeakerBtn) {
   toggleSpeakerBtn.addEventListener('click', () => {
     isSpeakerMuted = !isSpeakerMuted;
     if (remoteVideo) remoteVideo.muted = isSpeakerMuted;
     speakerBtnIcon.textContent = isSpeakerMuted ? '🔇' : '🔊';
-    speakerBtnLabel.textContent = isSpeakerMuted ? 'Muted' : 'Sound On';
+    toggleSpeakerBtn.style.background = isSpeakerMuted ? 'rgba(239, 68, 68, 0.4)' : '';
   });
 }
 
-// Screen Sharing
 if (shareScreenBtn) {
   shareScreenBtn.addEventListener('click', async () => {
     if (!isSharingScreen) {
       try {
         screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
-        
         peerConnections.forEach(pc => {
           const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
           if (sender) sender.replaceTrack(screenTrack);
         });
-
         if (localVideo) localVideo.srcObject = screenStream;
-        shareScreenBtn.style.background = '#e0e7ff';
+        shareScreenBtn.style.background = 'rgba(255, 252, 0, 0.3)';
         isSharingScreen = true;
 
-        screenTrack.onended = () => {
-          stopScreenSharing();
-        };
-      } catch (err) {
-        addLog(`Screen share note: ${err.message}`, 'warning');
-      }
+        screenTrack.onended = () => stopScreenSharing();
+      } catch (e) {}
     } else {
       stopScreenSharing();
     }
@@ -1324,70 +1151,31 @@ function stopScreenSharing() {
   isSharingScreen = false;
 }
 
-// Fullscreen
-if (toggleFullscreenBtn) {
-  toggleFullscreenBtn.addEventListener('click', () => {
-    const stage = document.getElementById('videoGrid');
-    if (!stage) return;
+if (toggleFullscreenBtn || headerFullscreenBtn) {
+  const toggleFull = () => {
+    const frame = document.getElementById('immersiveVideoFrame');
+    if (!frame) return;
     if (!document.fullscreenElement) {
-      stage.requestFullscreen().catch(() => {});
+      frame.requestFullscreen().catch(() => {});
     } else {
       document.exitFullscreen().catch(() => {});
     }
-  });
-}
-
-// Direct Dial Buttons
-if (startVideoCallBtn && targetIdInput) {
-  startVideoCallBtn.addEventListener('click', () => {
-    callUser(targetIdInput.value, 'video');
-  });
-}
-if (startAudioCallBtn && targetIdInput) {
-  startAudioCallBtn.addEventListener('click', () => {
-    callUser(targetIdInput.value, 'audio');
-  });
+  };
+  if (toggleFullscreenBtn) toggleFullscreenBtn.addEventListener('click', toggleFull);
+  if (headerFullscreenBtn) headerFullscreenBtn.addEventListener('click', toggleFull);
 }
 
 // ===================================================================
-// COPY & SHARE LINK ACTIONS
-// ===================================================================
-if (copyIdBtn) {
-  copyIdBtn.addEventListener('click', () => {
-    if (!myUniqueId) return;
-    navigator.clipboard.writeText(myUniqueId).then(() => {
-      copyIdBtn.innerHTML = '<span>✔</span> Copied!';
-      setTimeout(() => { copyIdBtn.innerHTML = '<span>📋</span> Copy'; }, 2000);
-    });
-  });
-}
-
-if (shareLinkBtn) {
-  shareLinkBtn.addEventListener('click', () => {
-    if (!myUniqueId) return;
-    const directUrl = `${window.location.origin}/?call=${encodeURIComponent(myUniqueId)}`;
-    navigator.clipboard.writeText(directUrl).then(() => {
-      shareLinkBtn.innerHTML = '<span>✔</span> Link Copied!';
-      setTimeout(() => { shareLinkBtn.innerHTML = '<span>🔗</span> Share'; }, 2000);
-    });
-  });
-}
-
-// ===================================================================
-// INITIALIZE APPLICATION SESSION & SOCKET
+// APPLICATION INIT & SOCKET CONNECTION
 // ===================================================================
 function initAppSession(user) {
   currentUser = user;
-  myUniqueId = user.callerId;
+  myUsername = user.username;
 
-  // Header Profile Updates
   if (userProfileCapsule) userProfileCapsule.style.display = 'flex';
   if (guestAuthActions) guestAuthActions.style.display = 'none';
   if (headerUserName) headerUserName.textContent = user.name;
-  if (headerUserEmail) headerUserEmail.textContent = user.email || 'Caller';
-  if (myDisplayId) myDisplayId.textContent = user.callerId;
-  if (sidebarIncomingMyIdBadge) sidebarIncomingMyIdBadge.textContent = `#${user.callerId}`;
-  if (localUserTag) localUserTag.textContent = `${user.name} (#${user.callerId})`;
+  if (headerUserHandle) headerUserHandle.textContent = `@${user.username}`;
 
   if (user.avatar) {
     if (headerUserAvatar) {
@@ -1397,14 +1185,11 @@ function initAppSession(user) {
     if (headerUserAvatarPlaceholder) headerUserAvatarPlaceholder.style.display = 'none';
   }
 
-  // Connect Socket.io
   connectSocketIO();
 }
 
 function connectSocketIO() {
-  if (socket) {
-    socket.disconnect();
-  }
+  if (socket) socket.disconnect();
 
   socket = io({
     reconnection: true,
@@ -1413,105 +1198,89 @@ function connectSocketIO() {
   });
 
   socket.on('connect', () => {
-    addLog(`Connected to CallPulse server. Registering account #${myUniqueId}...`, 'success');
-    if (networkStatusDot) networkStatusDot.style.background = '#22c55e';
-    if (networkStatusText) networkStatusText.innerHTML = `<b>Connected as ${currentUser?.name}:</b> Ready for real-time calling`;
-
+    addLog(`Connected to SnapCall. Authenticated as @${myUsername}`, 'success');
     socket.emit('register-user', {
-      uniqueId: myUniqueId,
-      email: currentUser?.email,
+      username: myUsername,
       name: currentUser?.name,
+      email: currentUser?.email,
       avatar: currentUser?.avatar
     });
   });
 
   socket.on('disconnect', () => {
-    addLog('Disconnected from server. Reconnecting...', 'warning');
-    if (networkStatusDot) networkStatusDot.style.background = '#ef4444';
+    addLog('Disconnected from SnapCall server. Reconnecting...', 'warning');
   });
 
-  socket.on('registered-success', (data) => {
-    addLog(`Caller ID registered with server: #${data.displayId}`, 'success');
-  });
-
-  // Real-time Friends Data Synchronization
+  // Real-time Friends Sync
   socket.on('friends-data-updated', (data) => {
     friendsList = data.friends || [];
     pendingReceivedList = data.pendingReceived || [];
     pendingSentList = data.pendingSent || [];
-    renderFriendsList();
+    renderFriendsFeed();
     renderRequests();
   });
 
   // Real-time Incoming Friend Request Alert
   socket.on('incoming-friend-request', ({ sender }) => {
-    addLog(`[FRIEND REQUEST] Incoming request from ${sender.name} (${sender.email || sender.callerId})`, 'signal');
+    addLog(`[FRIEND REQUEST] Incoming request from @${sender.username} (${sender.name})`, 'signal');
     playNotificationChime();
-    alert(`👋 Friend Request: ${sender.name} (${sender.email || '#' + sender.callerId}) sent you a friend request! Go to the Requests tab to accept.`);
+    alert(`👻 Friend Request: @${sender.username} (${sender.name}) added you on SnapCall! Accept in the Added Me tab to video call.`);
   });
 
-  // Friend Request Sent Success
   socket.on('friend-request-sent-success', ({ message }) => {
     alert(message || 'Friend request sent!');
     if (addFriendInput) addFriendInput.value = '';
     if (searchResultCard) searchResultCard.style.display = 'none';
   });
 
-  // Friend Request Accepted Notice
-  socket.on('friend-request-accepted-notice', ({ message, friend }) => {
-    addLog(`[FRIENDSHIP ACCEPTED] ${message}`, 'success');
+  socket.on('friend-request-accepted-notice', ({ message }) => {
+    addLog(`[FRIENDSHIP CONFIRMED] ${message}`, 'success');
     playNotificationChime();
     alert(message);
   });
 
-  // Friend Request Error
   socket.on('friend-request-error', ({ message }) => {
     alert(message);
   });
 
-  // ==========================================
-  // CALLING SOCKET EVENTS
-  // ==========================================
+  // Calling Events
   socket.on('call-ringing', (data) => {
-    addLog(`[CALL STATUS] Target friend #${data.targetId} is ringing -> STATUS: RINGING`, 'success');
+    addLog(`[CALL RINGING] @${data.targetUsername} is ringing!`, 'success');
     if (outgoingStatusText) outgoingStatusText.textContent = 'RINGING... 🔔';
-    if (data.receiverHasExistingCall) {
-      if (outgoingDialogNote) {
-        outgoingDialogNote.innerHTML = `Friend is on another call, but <b>RINGING</b> was sent! (Call Waiting active)`;
-      }
-    }
   });
 
   socket.on('incoming-call', (data) => {
-    addLog(`[INCOMING CALL] From ${data.callerName} (#${data.callerId}) [${data.callType.toUpperCase()}]`, 'signal');
-    handleIncomingCallNotification(data);
+    addLog(`[INCOMING CALL] From @${data.callerUsername} (${data.callerName})`, 'signal');
+    handleIncomingCall(data);
   });
 
   socket.on('call-accepted', async (data) => {
-    addLog(`[CALL ACCEPTED] Connected with #${data.peerDisplayId}`, 'success');
+    addLog(`[CALL CONNECTED] Video call active with @${data.peerUsername}`, 'success');
     closeOutgoingModal();
     currentCallId = data.callId;
     activeCallType = data.callType;
-    startCallSessionUI(data.participants, data.callType);
-    await initiatePeerConnection(data.peerId, data.peerDisplayId, true);
+    const peer = { username: data.peerUsername, name: data.peerName, avatar: data.peerAvatar };
+    startCallSessionUI(peer, data.callType);
+    await initiatePeerConnection(data.peerUsername, true);
   });
 
   socket.on('call-connected', (data) => {
-    addLog(`[CALL CONNECTED] Joined call with #${data.peerDisplayId}`, 'success');
+    addLog(`[CALL CONNECTED] Connected with @${data.peerUsername}`, 'success');
     currentCallId = data.callId;
     activeCallType = data.callType;
-    startCallSessionUI(data.participants, data.callType);
+    const peer = { username: data.peerUsername, name: data.peerName, avatar: data.peerAvatar };
+    startCallSessionUI(peer, data.callType);
   });
 
   socket.on('call-rejected', () => {
     closeOutgoingModal();
-    alert('Call was declined by receiver.');
+    alert('Friend declined the call.');
   });
 
   socket.on('call-failed', (data) => {
     closeOutgoingModal();
     if (data.reason === 'NOT_FRIENDS') {
-      showNotFriendsAlert(data.message, data.targetId);
+      showNotFriendsAlert(data.message, data.targetUsername);
     } else {
       alert(`Call failed: ${data.message}`);
     }
@@ -1526,41 +1295,37 @@ function connectSocketIO() {
   });
 
   // WebRTC Signals
-  socket.on('webrtc-offer', async ({ fromUserId, offer, callId }) => {
-    addLog(`[WebRTC] Received Offer from ID #${fromUserId}`, 'signal');
-    const pc = await getOrCreatePeerConnection(fromUserId);
+  socket.on('webrtc-offer', async ({ fromUsername, offer, callId }) => {
+    addLog(`[WebRTC] Received offer from @${fromUsername}`, 'signal');
+    const pc = await getOrCreatePeerConnection(fromUsername);
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    await processPendingIceCandidates(fromUserId, pc);
+    await processPendingIceCandidates(fromUsername, pc);
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
     socket.emit('webrtc-answer', {
-      targetUserId: fromUserId,
+      targetUsername: fromUsername,
       answer,
       callId
     });
   });
 
-  socket.on('webrtc-answer', async ({ fromUserId, answer }) => {
-    addLog(`[WebRTC] Received Answer from ID #${fromUserId}`, 'signal');
-    const pc = peerConnections.get(fromUserId);
+  socket.on('webrtc-answer', async ({ fromUsername, answer }) => {
+    addLog(`[WebRTC] Received answer from @${fromUsername}`, 'signal');
+    const pc = peerConnections.get(fromUsername);
     if (pc) {
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      await processPendingIceCandidates(fromUserId, pc);
+      await processPendingIceCandidates(fromUsername, pc);
     }
   });
 
-  socket.on('ice-candidate', async ({ fromUserId, candidate }) => {
-    const pc = peerConnections.get(fromUserId);
+  socket.on('ice-candidate', async ({ fromUsername, candidate }) => {
+    const pc = peerConnections.get(fromUsername);
     if (pc && pc.remoteDescription) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (e) {}
+      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } catch (e) {}
     } else {
-      if (!pendingIceCandidates.has(fromUserId)) {
-        pendingIceCandidates.set(fromUserId, []);
-      }
-      pendingIceCandidates.get(fromUserId).push(candidate);
+      if (!pendingIceCandidates.has(fromUsername)) pendingIceCandidates.set(fromUsername, []);
+      pendingIceCandidates.get(fromUsername).push(candidate);
     }
   });
 }
@@ -1574,21 +1339,12 @@ function escapeHtml(text) {
 // APPLICATION BOOTSTRAP
 // ===================================================================
 window.addEventListener('DOMContentLoaded', () => {
-  setupTabs();
+  setupFeedTabs();
 
-  // Check stored user session
   const stored = getStoredUser();
-  if (stored && stored.callerId) {
+  if (stored && stored.username) {
     initAppSession(stored);
   } else {
-    // Show Auth Modal if user is not logged in
     openAuthModal();
-  }
-
-  // Pre-fill target ID from URL parameter (e.g. ?call=842-195)
-  const urlParams = new URLSearchParams(window.location.search);
-  const directCallId = urlParams.get('call');
-  if (directCallId && targetIdInput) {
-    targetIdInput.value = directCallId;
   }
 });

@@ -36,14 +36,14 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Helper to normalize Unique IDs (e.g. "849-210" -> "849210")
-function normalizeId(id) {
-  if (!id) return '';
-  return String(id).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+// Clean Username helper (e.g. "@Nitish_1" -> "nitish_1")
+function cleanUsername(str) {
+  if (!str) return '';
+  return String(str).trim().toLowerCase().replace(/^@+/, '').replace(/[^a-z0-9_.-]/g, '');
 }
 
 // ==========================================
-// PERSISTENT USER & FRIENDS DATA STORE
+// PERSISTENT USER & FRIENDS DATA STORE (SNAPCHAT-STYLE)
 // ==========================================
 const USERS_FILE = path.join(__dirname, 'users.json');
 
@@ -51,7 +51,24 @@ function loadUsersData() {
   try {
     if (fs.existsSync(USERS_FILE)) {
       const raw = fs.readFileSync(USERS_FILE, 'utf-8');
-      return JSON.parse(raw);
+      const list = JSON.parse(raw);
+      // Migrate any legacy users to username format
+      return list.map(u => {
+        const uName = cleanUsername(u.username || (u.email ? u.email.split('@')[0] : u.name || 'user_' + Math.floor(Math.random() * 900)));
+        return {
+          id: u.id || `u_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          username: uName,
+          name: u.name || uName,
+          email: u.email || '',
+          password: u.password || '',
+          avatar: u.avatar || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(uName)}`,
+          authProvider: u.authProvider || 'email',
+          friends: Array.isArray(u.friends) ? u.friends.map(f => cleanUsername(f)) : [],
+          pendingSent: Array.isArray(u.pendingSent) ? u.pendingSent.map(f => cleanUsername(f)) : [],
+          pendingReceived: Array.isArray(u.pendingReceived) ? u.pendingReceived.map(f => cleanUsername(f)) : [],
+          createdAt: u.createdAt || new Date().toISOString()
+        };
+      });
     }
   } catch (err) {
     console.error('Error loading users.json:', err);
@@ -59,7 +76,7 @@ function loadUsersData() {
   return [];
 }
 
-let usersStore = loadUsersData(); // Array of user objects
+let usersStore = loadUsersData();
 
 function saveUsersData() {
   try {
@@ -69,17 +86,10 @@ function saveUsersData() {
   }
 }
 
-function generateUniqueCallerId() {
-  for (let attempts = 0; attempts < 1000; attempts++) {
-    const n1 = Math.floor(100 + Math.random() * 900);
-    const n2 = Math.floor(100 + Math.random() * 900);
-    const candidate = `${n1}-${n2}`;
-    const norm = normalizeId(candidate);
-    if (!usersStore.some(u => u.normCallerId === norm)) {
-      return candidate;
-    }
-  }
-  return `${Math.floor(100 + Math.random() * 900)}-${Math.floor(100 + Math.random() * 900)}`;
+function findUserByUsername(uname) {
+  if (!uname) return null;
+  const target = cleanUsername(uname);
+  return usersStore.find(u => u.username === target) || null;
 }
 
 function findUserByEmail(email) {
@@ -88,27 +98,37 @@ function findUserByEmail(email) {
   return usersStore.find(u => u.email && u.email.toLowerCase() === clean) || null;
 }
 
-function findUserByNormId(normId) {
-  if (!normId) return null;
-  const target = normalizeId(normId);
-  return usersStore.find(u => u.normCallerId === target) || null;
-}
-
 function findUserByQuery(query) {
   if (!query) return null;
-  const clean = query.trim().toLowerCase();
+  const clean = query.trim().toLowerCase().replace(/^@+/, '');
+  const byUsername = usersStore.find(u => u.username === clean);
+  if (byUsername) return byUsername;
   const byEmail = usersStore.find(u => u.email && u.email.toLowerCase() === clean);
   if (byEmail) return byEmail;
-  const norm = normalizeId(query);
-  return usersStore.find(u => u.normCallerId === norm) || null;
+  return usersStore.find(u => u.name && u.name.toLowerCase() === clean) || null;
+}
+
+function generateUniqueUsername(preferred) {
+  let base = cleanUsername(preferred) || 'user';
+  if (base.length < 3) base = 'user_' + base;
+  let candidate = base;
+  let counter = 1;
+  while (usersStore.some(u => u.username === candidate)) {
+    candidate = `${base}_${Math.floor(10 + Math.random() * 89)}`;
+    counter++;
+    if (counter > 200) {
+      candidate = `${base}_${Date.now().toString().slice(-4)}`;
+      break;
+    }
+  }
+  return candidate;
 }
 
 function sanitizeUser(user) {
   if (!user) return null;
   return {
     id: user.id,
-    callerId: user.callerId,
-    normCallerId: user.normCallerId,
+    username: user.username,
     name: user.name,
     email: user.email,
     avatar: user.avatar,
@@ -119,46 +139,43 @@ function sanitizeUser(user) {
   };
 }
 
-function getPopulatedFriendsData(normCallerId) {
-  const user = findUserByNormId(normCallerId);
+function getPopulatedFriendsData(username) {
+  const user = findUserByUsername(username);
   if (!user) {
     return { friends: [], pendingReceived: [], pendingSent: [] };
   }
 
-  const friendsList = (user.friends || []).map(fNormId => {
-    const fUser = findUserByNormId(fNormId);
-    const isOnline = connectedUsers.has(fNormId);
-    const connectedObj = connectedUsers.get(fNormId);
+  const friendsList = (user.friends || []).map(fUname => {
+    const fUser = findUserByUsername(fUname);
+    const isOnline = connectedUsers.has(fUname);
+    const connectedObj = connectedUsers.get(fUname);
     return {
-      callerId: fUser ? fUser.callerId : fNormId,
-      normCallerId: fNormId,
-      name: fUser ? fUser.name : `User #${fNormId}`,
+      username: fUname,
+      name: fUser ? fUser.name : `@${fUname}`,
       email: fUser ? fUser.email : '',
-      avatar: fUser ? fUser.avatar : '',
+      avatar: fUser ? fUser.avatar : `https://api.dicebear.com/7.x/adventurer/svg?seed=${fUname}`,
       isOnline,
       inCall: Boolean(connectedObj && connectedObj.activeCallId)
     };
   });
 
-  const pendingReceivedList = (user.pendingReceived || []).map(rNormId => {
-    const rUser = findUserByNormId(rNormId);
+  const pendingReceivedList = (user.pendingReceived || []).map(rUname => {
+    const rUser = findUserByUsername(rUname);
     return {
-      callerId: rUser ? rUser.callerId : rNormId,
-      normCallerId: rNormId,
-      name: rUser ? rUser.name : `User #${rNormId}`,
+      username: rUname,
+      name: rUser ? rUser.name : `@${rUname}`,
       email: rUser ? rUser.email : '',
-      avatar: rUser ? rUser.avatar : ''
+      avatar: rUser ? rUser.avatar : `https://api.dicebear.com/7.x/adventurer/svg?seed=${rUname}`
     };
   });
 
-  const pendingSentList = (user.pendingSent || []).map(sNormId => {
-    const sUser = findUserByNormId(sNormId);
+  const pendingSentList = (user.pendingSent || []).map(sUname => {
+    const sUser = findUserByUsername(sUname);
     return {
-      callerId: sUser ? sUser.callerId : sNormId,
-      normCallerId: sNormId,
-      name: sUser ? sUser.name : `User #${sNormId}`,
+      username: sUname,
+      name: sUser ? sUser.name : `@${sUname}`,
       email: sUser ? sUser.email : '',
-      avatar: sUser ? sUser.avatar : ''
+      avatar: sUser ? sUser.avatar : `https://api.dicebear.com/7.x/adventurer/svg?seed=${sUname}`
     };
   });
 
@@ -170,12 +187,12 @@ function getPopulatedFriendsData(normCallerId) {
 }
 
 // ==========================================
-// AUTHENTICATION & USERS REST APIS
+// REST APIS (EMAIL & GOOGLE AUTHENTICATION)
 // ==========================================
 
 // 1. Email Register
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, password } = req.body || {};
+  const { name, email, username, password } = req.body || {};
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'Valid email address is required' });
   }
@@ -184,23 +201,25 @@ app.post('/api/auth/register', (req, res) => {
   }
 
   const cleanEmail = email.trim().toLowerCase();
-  const existing = findUserByEmail(cleanEmail);
-  if (existing) {
-    return res.status(400).json({ error: 'An account with this email already exists. Please login.' });
+  if (findUserByEmail(cleanEmail)) {
+    return res.status(400).json({ error: 'An account with this email already exists. Please sign in.' });
   }
 
-  const callerId = generateUniqueCallerId();
-  const normCallerId = normalizeId(callerId);
-  const displayName = (name || '').trim() || cleanEmail.split('@')[0];
+  const desiredUsername = cleanUsername(username || cleanEmail.split('@')[0]);
+  if (findUserByUsername(desiredUsername)) {
+    return res.status(400).json({ error: `@${desiredUsername} is already taken. Please choose another username.` });
+  }
+
+  const finalUsername = generateUniqueUsername(desiredUsername);
+  const displayName = (name || '').trim() || finalUsername;
 
   const newUser = {
     id: `u_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    callerId,
-    normCallerId,
+    username: finalUsername,
     name: displayName,
     email: cleanEmail,
     password: password,
-    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+    avatar: `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(finalUsername)}`,
     authProvider: 'email',
     friends: [],
     pendingSent: [],
@@ -211,34 +230,34 @@ app.post('/api/auth/register', (req, res) => {
   usersStore.push(newUser);
   saveUsersData();
 
-  console.log(`[Auth Register] User registered: ${newUser.name} (${newUser.email}) -> ID #${newUser.callerId}`);
+  console.log(`[SnapCall Register] User registered: ${newUser.name} (@${newUser.username})`);
   return res.json({ success: true, user: sanitizeUser(newUser) });
 });
 
-// 2. Email Login
+// 2. Email / Username Login
 app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  const { emailOrUsername, password } = req.body || {};
+  if (!emailOrUsername || !password) {
+    return res.status(400).json({ error: 'Username or Email and password are required' });
   }
 
-  const cleanEmail = email.trim().toLowerCase();
-  const user = findUserByEmail(cleanEmail);
+  const clean = emailOrUsername.trim().toLowerCase().replace(/^@+/, '');
+  const user = findUserByEmail(clean) || findUserByUsername(clean);
   if (!user) {
-    return res.status(400).json({ error: 'No account found with this email. Please create an account.' });
+    return res.status(400).json({ error: 'No account found with this email or @username.' });
   }
 
   if (user.password && user.password !== password) {
     return res.status(400).json({ error: 'Incorrect password. Please try again.' });
   }
 
-  console.log(`[Auth Login] User logged in: ${user.name} (${user.email}) -> ID #${user.callerId}`);
+  console.log(`[SnapCall Login] Logged in: ${user.name} (@${user.username})`);
   return res.json({ success: true, user: sanitizeUser(user) });
 });
 
-// 3. Google Sign-In / Login
+// 3. Google Sign-In
 app.post('/api/auth/google', (req, res) => {
-  const { email, name, picture, googleId } = req.body || {};
+  const { email, name, picture, username } = req.body || {};
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'Valid Google email is required' });
   }
@@ -247,28 +266,25 @@ app.post('/api/auth/google', (req, res) => {
   let user = findUserByEmail(cleanEmail);
 
   if (user) {
-    // Existing user logging in with Google
     if (picture) user.avatar = picture;
     if (name && (!user.name || user.name === 'User')) user.name = name;
     user.authProvider = 'google';
     saveUsersData();
-    console.log(`[Google Auth] Existing user logged in: ${user.name} (${user.email}) -> ID #${user.callerId}`);
+    console.log(`[Google Auth] Logged in existing user: ${user.name} (@${user.username})`);
     return res.json({ success: true, user: sanitizeUser(user) });
   }
 
-  // Create new user via Google
-  const callerId = generateUniqueCallerId();
-  const normCallerId = normalizeId(callerId);
-  const displayName = (name || '').trim() || cleanEmail.split('@')[0];
+  const baseUname = cleanUsername(username || cleanEmail.split('@')[0]);
+  const finalUsername = generateUniqueUsername(baseUname);
+  const displayName = (name || '').trim() || finalUsername;
 
   user = {
     id: `u_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-    callerId,
-    normCallerId,
+    username: finalUsername,
     name: displayName,
     email: cleanEmail,
     password: '',
-    avatar: picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`,
+    avatar: picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(finalUsername)}`,
     authProvider: 'google',
     friends: [],
     pendingSent: [],
@@ -279,59 +295,58 @@ app.post('/api/auth/google', (req, res) => {
   usersStore.push(user);
   saveUsersData();
 
-  console.log(`[Google Auth] New user registered via Google: ${user.name} (${user.email}) -> ID #${user.callerId}`);
+  console.log(`[Google Auth] New user registered via Google: ${user.name} (@${user.username})`);
   return res.json({ success: true, user: sanitizeUser(user) });
 });
 
-// 4. Get Friends & Requests Data
-app.get('/api/user/friends-data/:normCallerId', (req, res) => {
-  const data = getPopulatedFriendsData(req.params.normCallerId);
+// 4. Get Friends Data
+app.get('/api/user/friends-data/:username', (req, res) => {
+  const data = getPopulatedFriendsData(cleanUsername(req.params.username));
   return res.json(data);
 });
 
-// 5. Search User for Friend Request
+// 5. Search User by Username, Name, or Email
 app.get('/api/user/search', (req, res) => {
   const query = req.query.q;
-  const requesterNormId = normalizeId(req.query.requesterId);
+  const requesterUsername = cleanUsername(req.query.requester);
   if (!query) return res.json({ user: null });
 
   const target = findUserByQuery(query);
   if (!target) return res.json({ user: null });
 
-  const requester = findUserByNormId(requesterNormId);
-  let relation = 'none'; // 'none' | 'self' | 'friends' | 'pending_sent' | 'pending_received'
+  const requester = findUserByUsername(requesterUsername);
+  let relation = 'none';
 
-  if (target.normCallerId === requesterNormId) {
+  if (target.username === requesterUsername) {
     relation = 'self';
-  } else if (requester && requester.friends.includes(target.normCallerId)) {
+  } else if (requester && requester.friends.includes(target.username)) {
     relation = 'friends';
-  } else if (requester && requester.pendingSent.includes(target.normCallerId)) {
+  } else if (requester && requester.pendingSent.includes(target.username)) {
     relation = 'pending_sent';
-  } else if (requester && requester.pendingReceived.includes(target.normCallerId)) {
+  } else if (requester && requester.pendingReceived.includes(target.username)) {
     relation = 'pending_received';
   }
 
   return res.json({
     user: {
-      callerId: target.callerId,
-      normCallerId: target.normCallerId,
+      username: target.username,
       name: target.name,
       email: target.email,
       avatar: target.avatar,
-      isOnline: connectedUsers.has(target.normCallerId)
+      isOnline: connectedUsers.has(target.username)
     },
     relation
   });
 });
 
 // In-Memory state management for Active WebRTC Calls
-// connectedUsers: normalizedId -> { socketId, uniqueId, displayId, name, email, avatar, activeCallId, currentCallType, inExternalCall }
+// connectedUsers: username -> { socketId, username, name, email, avatar, activeCallId, currentCallType, inExternalCall }
 const connectedUsers = new Map();
 
-// socketToUserId: socketId -> normalizedId
-const socketToUserId = new Map();
+// socketToUser: socketId -> username
+const socketToUser = new Map();
 
-// activeCalls: callId -> { callId, initiatorId, participants: Set<normalizedId>, callType, status }
+// activeCalls: callId -> { callId, initiatorUsername, participants: Set<username>, callType, status }
 const activeCalls = new Map();
 
 // pendingCallTimeouts: callId -> timeoutHandle (35s timeout before UNAVAILABLE)
@@ -340,43 +355,36 @@ const pendingCallTimeouts = new Map();
 io.on('connection', (socket) => {
   console.log(`[Socket Connected] ID: ${socket.id}`);
 
-  // 1. User Registration by Unique ID / Account
-  socket.on('register-user', ({ uniqueId, email, name, avatar }) => {
-    if (!uniqueId) return;
+  // 1. Register User Socket
+  socket.on('register-user', ({ username, name, email, avatar }) => {
+    if (!username) return;
 
-    const normId = normalizeId(uniqueId);
-    const existing = connectedUsers.get(normId) || {};
-    const userInDb = findUserByNormId(normId);
+    const uName = cleanUsername(username);
+    const existing = connectedUsers.get(uName) || {};
+    const userInDb = findUserByUsername(uName);
 
-    // Join room for this normalized unique ID
-    socket.join(normId);
+    // Join room for this username
+    socket.join(`user:${uName}`);
 
-    connectedUsers.set(normId, {
+    connectedUsers.set(uName, {
       socketId: socket.id,
-      uniqueId: normId,
-      displayId: userInDb ? userInDb.callerId : uniqueId,
-      name: userInDb ? userInDb.name : (name || 'User'),
+      username: uName,
+      name: userInDb ? userInDb.name : (name || uName),
       email: userInDb ? userInDb.email : (email || ''),
       avatar: userInDb ? userInDb.avatar : (avatar || ''),
       activeCallId: existing.activeCallId || null,
       inExternalCall: false
     });
-    socketToUserId.set(socket.id, normId);
+    socketToUser.set(socket.id, uName);
 
-    console.log(`[User Registered] ID: #${uniqueId} (${userInDb?.name || name || 'User'}) on socket ${socket.id}`);
+    console.log(`[User Active] @${uName} (${userInDb?.name || name}) on socket ${socket.id}`);
 
-    // Confirm registration to caller
     socket.emit('registered-success', {
-      uniqueId: normId,
-      displayId: userInDb ? userInDb.callerId : uniqueId,
       user: sanitizeUser(userInDb)
     });
 
-    // Send initial friends data to user
-    socket.emit('friends-data-updated', getPopulatedFriendsData(normId));
-
-    // Notify user's friends that they are now online
-    broadcastFriendsStatusUpdate(normId);
+    socket.emit('friends-data-updated', getPopulatedFriendsData(uName));
+    broadcastFriendsStatusUpdate(uName);
     broadcastOnlineUsers();
   });
 
@@ -387,233 +395,210 @@ io.on('connection', (socket) => {
 
   // 3. FRIENDS: Send Friend Request
   socket.on('send-friend-request', ({ targetQuery }) => {
-    const senderNormId = socketToUserId.get(socket.id);
-    const sender = findUserByNormId(senderNormId);
+    const senderUsername = socketToUser.get(socket.id);
+    const sender = findUserByUsername(senderUsername);
 
     if (!sender) {
-      socket.emit('friend-request-error', { message: 'You must be logged in to send a friend request.' });
+      socket.emit('friend-request-error', { message: 'You must be signed in to add friends.' });
       return;
     }
 
     const target = findUserByQuery(targetQuery);
     if (!target) {
-      socket.emit('friend-request-error', { message: `No registered user found with "${targetQuery}". They must create an account first!` });
+      socket.emit('friend-request-error', { message: `No user found with "${targetQuery}". Make sure they have a SnapCall account!` });
       return;
     }
 
-    if (target.normCallerId === senderNormId) {
-      socket.emit('friend-request-error', { message: 'You cannot send a friend request to yourself.' });
+    if (target.username === senderUsername) {
+      socket.emit('friend-request-error', { message: 'You cannot add yourself as a friend.' });
       return;
     }
 
-    if (sender.friends.includes(target.normCallerId)) {
-      socket.emit('friend-request-error', { message: `${target.name} is already in your friends list!` });
+    if (sender.friends.includes(target.username)) {
+      socket.emit('friend-request-error', { message: `@${target.username} is already on your friends list!` });
       return;
     }
 
-    if (sender.pendingSent.includes(target.normCallerId)) {
-      socket.emit('friend-request-error', { message: `Friend request already sent to ${target.name}. Awaiting acceptance.` });
+    if (sender.pendingSent.includes(target.username)) {
+      socket.emit('friend-request-error', { message: `Friend request already sent to @${target.username}. Awaiting acceptance.` });
       return;
     }
 
-    // If target already sent a request to sender, auto-accept it!
-    if (sender.pendingReceived.includes(target.normCallerId)) {
-      sender.friends.push(target.normCallerId);
-      target.friends.push(sender.normCallerId);
-      sender.pendingReceived = sender.pendingReceived.filter(id => id !== target.normCallerId);
-      target.pendingSent = target.pendingSent.filter(id => id !== sender.normCallerId);
+    // Auto-accept if target already sent a request to sender
+    if (sender.pendingReceived.includes(target.username)) {
+      sender.friends.push(target.username);
+      target.friends.push(sender.username);
+      sender.pendingReceived = sender.pendingReceived.filter(u => u !== target.username);
+      target.pendingSent = target.pendingSent.filter(u => u !== sender.username);
       saveUsersData();
 
       socket.emit('friend-request-accepted-notice', {
-        message: `You and ${target.name} are now friends! You can now call each other.`,
+        message: `You and @${target.username} are now friends on SnapCall! You can now video call.`,
         friend: sanitizeUser(target)
       });
-      io.to(target.normCallerId).emit('friend-request-accepted-notice', {
-        message: `${sender.name} accepted your friend request! You can now call each other.`,
+      io.to(`user:${target.username}`).emit('friend-request-accepted-notice', {
+        message: `@${sender.username} accepted your friend request! You can now video call.`,
         friend: sanitizeUser(sender)
       });
 
-      socket.emit('friends-data-updated', getPopulatedFriendsData(senderNormId));
-      io.to(target.normCallerId).emit('friends-data-updated', getPopulatedFriendsData(target.normCallerId));
+      socket.emit('friends-data-updated', getPopulatedFriendsData(senderUsername));
+      io.to(`user:${target.username}`).emit('friends-data-updated', getPopulatedFriendsData(target.username));
       return;
     }
 
-    // Normal Request Send
-    sender.pendingSent.push(target.normCallerId);
-    target.pendingReceived.push(sender.normCallerId);
+    // Normal Request
+    sender.pendingSent.push(target.username);
+    target.pendingReceived.push(sender.username);
     saveUsersData();
 
     socket.emit('friend-request-sent-success', {
-      message: `Friend request sent to ${target.name} (${target.email || target.callerId})!`,
+      message: `Friend request sent to @${target.username} (${target.name})!`,
       target: sanitizeUser(target)
     });
 
-    // Notify target in real-time if online
-    io.to(target.normCallerId).emit('incoming-friend-request', {
+    // Notify target in real-time
+    io.to(`user:${target.username}`).emit('incoming-friend-request', {
       sender: {
-        callerId: sender.callerId,
-        normCallerId: sender.normCallerId,
+        username: sender.username,
         name: sender.name,
         email: sender.email,
         avatar: sender.avatar
       }
     });
 
-    // Refresh friends data for both
-    socket.emit('friends-data-updated', getPopulatedFriendsData(senderNormId));
-    io.to(target.normCallerId).emit('friends-data-updated', getPopulatedFriendsData(target.normCallerId));
+    socket.emit('friends-data-updated', getPopulatedFriendsData(senderUsername));
+    io.to(`user:${target.username}`).emit('friends-data-updated', getPopulatedFriendsData(target.username));
   });
 
   // 4. FRIENDS: Accept Friend Request
-  socket.on('accept-friend-request', ({ senderNormId }) => {
-    const receiverNormId = socketToUserId.get(socket.id);
-    const receiver = findUserByNormId(receiverNormId);
-    const sender = findUserByNormId(senderNormId);
+  socket.on('accept-friend-request', ({ senderUsername }) => {
+    const receiverUsername = socketToUser.get(socket.id);
+    const receiver = findUserByUsername(receiverUsername);
+    const sender = findUserByUsername(cleanUsername(senderUsername));
 
     if (!receiver || !sender) return;
 
-    if (!receiver.friends.includes(senderNormId)) {
-      receiver.friends.push(senderNormId);
+    if (!receiver.friends.includes(sender.username)) {
+      receiver.friends.push(sender.username);
     }
-    if (!sender.friends.includes(receiverNormId)) {
-      sender.friends.push(receiverNormId);
+    if (!sender.friends.includes(receiver.username)) {
+      sender.friends.push(receiver.username);
     }
 
-    receiver.pendingReceived = receiver.pendingReceived.filter(id => id !== senderNormId);
-    sender.pendingSent = sender.pendingSent.filter(id => id !== receiverNormId);
+    receiver.pendingReceived = receiver.pendingReceived.filter(u => u !== sender.username);
+    sender.pendingSent = sender.pendingSent.filter(u => u !== receiver.username);
     saveUsersData();
 
-    console.log(`[Friendship Created] ${receiver.name} and ${sender.name} are now friends!`);
+    console.log(`[Snapchat Friends] @${receiver.username} and @${sender.username} are now friends!`);
 
     socket.emit('friend-request-accepted-notice', {
-      message: `You and ${sender.name} are now friends! You can now call each other.`,
+      message: `You and @${sender.username} are now friends! You can now start video calls.`,
       friend: sanitizeUser(sender)
     });
-    io.to(senderNormId).emit('friend-request-accepted-notice', {
-      message: `${receiver.name} accepted your friend request! You can now call each other.`,
+    io.to(`user:${sender.username}`).emit('friend-request-accepted-notice', {
+      message: `@${receiver.username} accepted your friend request! You can now start video calls.`,
       friend: sanitizeUser(receiver)
     });
 
-    socket.emit('friends-data-updated', getPopulatedFriendsData(receiverNormId));
-    io.to(senderNormId).emit('friends-data-updated', getPopulatedFriendsData(senderNormId));
+    socket.emit('friends-data-updated', getPopulatedFriendsData(receiverUsername));
+    io.to(`user:${sender.username}`).emit('friends-data-updated', getPopulatedFriendsData(sender.username));
   });
 
   // 5. FRIENDS: Reject Friend Request
-  socket.on('reject-friend-request', ({ senderNormId }) => {
-    const receiverNormId = socketToUserId.get(socket.id);
-    const receiver = findUserByNormId(receiverNormId);
-    const sender = findUserByNormId(senderNormId);
+  socket.on('reject-friend-request', ({ senderUsername }) => {
+    const receiverUsername = socketToUser.get(socket.id);
+    const receiver = findUserByUsername(receiverUsername);
+    const sender = findUserByUsername(cleanUsername(senderUsername));
 
     if (!receiver) return;
 
-    receiver.pendingReceived = receiver.pendingReceived.filter(id => id !== senderNormId);
+    receiver.pendingReceived = receiver.pendingReceived.filter(u => u !== cleanUsername(senderUsername));
     if (sender) {
-      sender.pendingSent = sender.pendingSent.filter(id => id !== receiverNormId);
+      sender.pendingSent = sender.pendingSent.filter(u => u !== receiverUsername);
     }
     saveUsersData();
 
-    socket.emit('friends-data-updated', getPopulatedFriendsData(receiverNormId));
+    socket.emit('friends-data-updated', getPopulatedFriendsData(receiverUsername));
     if (sender) {
-      io.to(senderNormId).emit('friends-data-updated', getPopulatedFriendsData(senderNormId));
+      io.to(`user:${sender.username}`).emit('friends-data-updated', getPopulatedFriendsData(sender.username));
     }
   });
 
-  // 6. FRIENDS: Cancel Sent Request
-  socket.on('cancel-friend-request', ({ targetNormId }) => {
-    const senderNormId = socketToUserId.get(socket.id);
-    const sender = findUserByNormId(senderNormId);
-    const target = findUserByNormId(targetNormId);
-
-    if (!sender) return;
-
-    sender.pendingSent = sender.pendingSent.filter(id => id !== targetNormId);
-    if (target) {
-      target.pendingReceived = target.pendingReceived.filter(id => id !== senderNormId);
-    }
-    saveUsersData();
-
-    socket.emit('friends-data-updated', getPopulatedFriendsData(senderNormId));
-    if (target) {
-      io.to(targetNormId).emit('friends-data-updated', getPopulatedFriendsData(targetNormId));
-    }
-  });
-
-  // 7. FRIENDS: Remove Friend
-  socket.on('remove-friend', ({ friendNormId }) => {
-    const userNormId = socketToUserId.get(socket.id);
-    const user = findUserByNormId(userNormId);
-    const friend = findUserByNormId(friendNormId);
+  // 6. FRIENDS: Remove Friend
+  socket.on('remove-friend', ({ friendUsername }) => {
+    const userUsername = socketToUser.get(socket.id);
+    const user = findUserByUsername(userUsername);
+    const friend = findUserByUsername(cleanUsername(friendUsername));
 
     if (!user) return;
 
-    user.friends = user.friends.filter(id => id !== friendNormId);
+    user.friends = user.friends.filter(u => u !== cleanUsername(friendUsername));
     if (friend) {
-      friend.friends = friend.friends.filter(id => id !== userNormId);
+      friend.friends = friend.friends.filter(u => u !== userUsername);
     }
     saveUsersData();
 
-    socket.emit('friends-data-updated', getPopulatedFriendsData(userNormId));
+    socket.emit('friends-data-updated', getPopulatedFriendsData(userUsername));
     if (friend) {
-      io.to(friendNormId).emit('friends-data-updated', getPopulatedFriendsData(friendNormId));
+      io.to(`user:${friend.username}`).emit('friends-data-updated', getPopulatedFriendsData(friend.username));
     }
   });
 
-  // 8. FRIENDS: Get Fresh Data
+  // 7. FRIENDS: Get Fresh Data
   socket.on('get-friends-data', () => {
-    const userNormId = socketToUserId.get(socket.id);
-    if (userNormId) {
-      socket.emit('friends-data-updated', getPopulatedFriendsData(userNormId));
+    const uName = socketToUser.get(socket.id);
+    if (uName) {
+      socket.emit('friends-data-updated', getPopulatedFriendsData(uName));
     }
   });
 
   // ==========================================
-  // WEBRTC CALLING ENGINE (PROTECTED: FRIENDS ONLY)
+  // SNAPCHAT-STYLE HD VIDEO CALLING ENGINE
   // ==========================================
-  socket.on('initiate-call', ({ targetId, callType = 'video' }) => {
-    const callerId = socketToUserId.get(socket.id);
-    const caller = connectedUsers.get(callerId);
+  socket.on('initiate-call', ({ targetUsername, callType = 'video' }) => {
+    const callerUname = socketToUser.get(socket.id);
+    const caller = connectedUsers.get(callerUname);
 
     if (!caller) {
-      socket.emit('call-error', { message: 'You must be registered/logged in to make a call.' });
+      socket.emit('call-error', { message: 'You must be signed in to video call.' });
       return;
     }
 
-    const normTargetId = normalizeId(targetId);
-    const callerUser = findUserByNormId(callerId);
-    const targetUser = findUserByNormId(normTargetId);
+    const cleanTarget = cleanUsername(targetUsername);
+    const callerUser = findUserByUsername(callerUname);
+    const targetUser = findUserByUsername(cleanTarget);
 
-    if (callerId === normTargetId) {
-      socket.emit('call-error', { message: 'You cannot call your own ID! Enter the ID of another user.' });
+    if (callerUname === cleanTarget) {
+      socket.emit('call-error', { message: 'You cannot call yourself.' });
       return;
     }
 
-    // 🔒 CORE ENFORCEMENT: Only accepted friends can call each other!
-    const isFriend = callerUser && callerUser.friends && callerUser.friends.includes(normTargetId);
+    // 🔒 SNAPCHAT FRIEND ENFORCEMENT: Only accepted friends can call each other!
+    const isFriend = callerUser && callerUser.friends && callerUser.friends.includes(cleanTarget);
     if (!isFriend) {
-      console.log(`[Call Blocked] Caller #${caller.displayId} is NOT friends with target #${targetId}`);
+      console.log(`[Snapchat Call Blocked] @${callerUname} tried to call non-friend @${cleanTarget}`);
       socket.emit('call-failed', {
-        targetId,
+        targetUsername: cleanTarget,
         reason: 'NOT_FRIENDS',
-        message: `You can only call accepted friends! Send a friend request to ${targetUser ? targetUser.name : targetId} first.`,
+        message: `You can only call friends on SnapCall! Add @${targetUser ? targetUser.username : cleanTarget} as a friend first.`,
         targetUser: targetUser ? {
+          username: targetUser.username,
           name: targetUser.name,
           email: targetUser.email,
-          callerId: targetUser.callerId,
-          normCallerId: targetUser.normCallerId
+          avatar: targetUser.avatar
         } : null
       });
       return;
     }
 
-    const receiver = connectedUsers.get(normTargetId);
+    const receiver = connectedUsers.get(cleanTarget);
 
-    // Check whether receiver is online and reachable
     if (!receiver || !receiver.socketId) {
-      console.log(`[Call Attempt] Target Friend ID "${targetId}" is offline -> UNAVAILABLE`);
+      console.log(`[Call Attempt] Friend @${cleanTarget} is offline -> UNAVAILABLE`);
       socket.emit('call-failed', {
-        targetId,
+        targetUsername: cleanTarget,
         reason: 'UNAVAILABLE',
-        message: `${targetUser ? targetUser.name : targetId} is currently offline. They will receive your call when online.`
+        message: `@${targetUser ? targetUser.username : cleanTarget} is currently offline.`
       });
       return;
     }
@@ -622,38 +607,35 @@ io.on('connection', (socket) => {
     const isReceiverAlreadyInCall = Boolean(receiver.activeCallId);
 
     console.log(
-      `[Call Initiated] Friend Call: #${caller.displayId} (${callerUser?.name}) -> #${receiver.displayId} (${targetUser?.name}) [${callType.toUpperCase()}]` +
-      (isReceiverAlreadyInCall ? ` [RECEIVER IN CALL - NO BUSY SENT, SENDING RINGING]` : '')
+      `[Snapchat Call Initiated] @${callerUname} (${callerUser?.name}) -> @${cleanTarget} (${targetUser?.name}) [${callType.toUpperCase()}]` +
+      (isReceiverAlreadyInCall ? ` [RECEIVER IN CALL - ZERO BUSY ACTIVE]` : '')
     );
 
-    // Save pending call state
     activeCalls.set(callId, {
       callId,
-      initiatorId: callerId,
-      targetUserId: normTargetId,
-      participants: new Set([callerId]),
+      initiatorUsername: callerUname,
+      targetUsername: cleanTarget,
+      participants: new Set([callerUname]),
       callType,
       status: 'pending'
     });
 
-    // Rule 2 & 3: Tell caller immediately: RINGING (NEVER USER_BUSY!)
+    // Zero-busy: caller gets RINGING immediately
     socket.emit('call-ringing', {
       callId,
-      targetId: receiver.displayId,
-      targetName: targetUser?.name || receiver.displayId,
-      targetEmail: targetUser?.email || '',
+      targetUsername: cleanTarget,
+      targetName: targetUser?.name || cleanTarget,
       targetAvatar: targetUser?.avatar || '',
       status: 'RINGING',
       callType,
       receiverHasExistingCall: isReceiverAlreadyInCall
     });
 
-    // Send incoming-call notification to receiver room (Call Waiting HUD)
+    // Send incoming-call notification to receiver
     const incomingPayload = {
       callId,
-      callerId: caller.displayId,
-      callerNormId: callerId,
-      callerName: callerUser?.name || caller.displayId,
+      callerUsername: callerUname,
+      callerName: callerUser?.name || callerUname,
       callerEmail: callerUser?.email || '',
       callerAvatar: callerUser?.avatar || '',
       callType,
@@ -661,36 +643,26 @@ io.on('connection', (socket) => {
       currentCallId: receiver.activeCallId
     };
 
-    io.to(normTargetId).emit('incoming-call', incomingPayload);
+    io.to(`user:${cleanTarget}`).emit('incoming-call', incomingPayload);
 
-    // 35-second timeout for UNAVAILABLE
+    // 35-second timeout
     const timeoutHandle = setTimeout(() => {
       const call = activeCalls.get(callId);
       if (call && call.status === 'pending') {
-        console.log(`[Call Timeout] Call ${callId} timed out -> UNAVAILABLE`);
+        console.log(`[Call Timeout] Call ${callId} timed out`);
         activeCalls.delete(callId);
         pendingCallTimeouts.delete(callId);
 
-        // Notify caller
-        io.to(callerId).emit('call-failed', {
+        io.to(`user:${callerUname}`).emit('call-failed', {
           callId,
-          targetId: receiver.displayId,
+          targetUsername: cleanTarget,
           reason: 'UNAVAILABLE',
-          message: 'No response. Call timed out (UNAVAILABLE).'
+          message: 'No response. Call timed out.'
         });
-        if (caller.socketId) {
-          io.to(caller.socketId).emit('call-failed', {
-            callId,
-            targetId: receiver.displayId,
-            reason: 'UNAVAILABLE',
-            message: 'No response. Call timed out (UNAVAILABLE).'
-          });
-        }
 
-        // Notify receiver to dismiss dialog
-        io.to(normTargetId).emit('call-missed', {
+        io.to(`user:${cleanTarget}`).emit('call-missed', {
           callId,
-          callerId: caller.displayId
+          callerUsername: callerUname
         });
       }
     }, 35000);
@@ -700,118 +672,50 @@ io.on('connection', (socket) => {
 
   // Accept Call
   socket.on('accept-call', ({ callId, mode = 'standard' }) => {
-    const receiverId = socketToUserId.get(socket.id);
-    const receiver = connectedUsers.get(receiverId);
+    const receiverUname = socketToUser.get(socket.id);
+    const receiver = connectedUsers.get(receiverUname);
     const pendingCall = activeCalls.get(callId);
 
     if (!pendingCall || !receiver) return;
 
     clearCallTimeout(callId);
 
-    const callerId = pendingCall.initiatorId;
-    const caller = connectedUsers.get(callerId);
-
-    if (mode === 'merge' && receiver.activeCallId) {
-      // MERGE MODE: Add caller to existing multi-person conference!
-      const currentCallId = receiver.activeCallId;
-      const currentCall = activeCalls.get(currentCallId);
-
-      if (currentCall) {
-        currentCall.participants.add(callerId);
-        if (caller) caller.activeCallId = currentCallId;
-        activeCalls.delete(callId);
-
-        console.log(`[Call Merged] ID #${caller?.displayId} merged into Call ${currentCallId}`);
-
-        const participantList = Array.from(currentCall.participants).map(id => {
-          const u = connectedUsers.get(id);
-          return { userId: id, displayId: u?.displayId || id, name: u?.name || id };
-        });
-
-        currentCall.participants.forEach(pid => {
-          const user = connectedUsers.get(pid);
-          if (user?.socketId) {
-            io.to(user.socketId).emit('participant-joined-room', {
-              callId: currentCallId,
-              newUserId: callerId,
-              newDisplayId: caller?.displayId,
-              callType: currentCall.callType,
-              participants: participantList
-            });
-          }
-        });
-
-        if (caller?.socketId) {
-          io.to(caller.socketId).emit('call-accepted', {
-            callId: currentCallId,
-            peerId: receiverId,
-            peerDisplayId: receiver.displayId,
-            callType: currentCall.callType,
-            mode: 'merged',
-            participants: participantList
-          });
-        }
-
-        broadcastOnlineUsers();
-        broadcastFriendsStatusUpdate(receiverId);
-        broadcastFriendsStatusUpdate(callerId);
-        return;
-      }
-    }
-
-    // STANDARD ACCEPT:
-    if (receiver.activeCallId && receiver.activeCallId !== callId) {
-      const oldCall = activeCalls.get(receiver.activeCallId);
-      if (oldCall) {
-        oldCall.participants.forEach(pid => {
-          if (pid !== receiverId) {
-            const peer = connectedUsers.get(pid);
-            if (peer?.socketId) {
-              io.to(peer.socketId).emit('peer-hold-state', {
-                callId: receiver.activeCallId,
-                userId: receiverId,
-                displayId: receiver.displayId,
-                isHeld: true,
-                reason: 'Switched to new incoming call'
-              });
-            }
-          }
-        });
-      }
-    }
+    const callerUname = pendingCall.initiatorUsername;
+    const caller = connectedUsers.get(callerUname);
 
     pendingCall.status = 'active';
-    pendingCall.participants.add(receiverId);
+    pendingCall.participants.add(receiverUname);
     receiver.activeCallId = callId;
     if (caller) caller.activeCallId = callId;
 
-    console.log(`[Call Accepted] Call ${callId} active between ID #${caller?.displayId} and ID #${receiver.displayId}`);
+    console.log(`[Call Connected] Call ${callId} active between @${callerUname} and @${receiverUname}`);
 
     const participantList = [
-      { userId: callerId, displayId: caller?.displayId, name: caller?.name },
-      { userId: receiverId, displayId: receiver.displayId, name: receiver.name }
+      { username: callerUname, name: caller?.name, avatar: caller?.avatar },
+      { username: receiverUname, name: receiver.name, avatar: receiver.avatar }
     ];
 
-    io.to(callerId).emit('call-accepted', {
+    io.to(`user:${callerUname}`).emit('call-accepted', {
       callId,
-      peerId: receiverId,
-      peerDisplayId: receiver.displayId,
+      peerUsername: receiverUname,
+      peerName: receiver.name,
+      peerAvatar: receiver.avatar,
       callType: pendingCall.callType,
-      mode: 'direct',
       participants: participantList
     });
 
     socket.emit('call-connected', {
       callId,
-      peerId: callerId,
-      peerDisplayId: caller?.displayId,
+      peerUsername: callerUname,
+      peerName: caller?.name,
+      peerAvatar: caller?.avatar,
       callType: pendingCall.callType,
       participants: participantList
     });
 
     broadcastOnlineUsers();
-    broadcastFriendsStatusUpdate(receiverId);
-    broadcastFriendsStatusUpdate(callerId);
+    broadcastFriendsStatusUpdate(receiverUname);
+    broadcastFriendsStatusUpdate(callerUname);
   });
 
   // Reject Call
@@ -821,126 +725,74 @@ io.on('connection', (socket) => {
     if (!call) return;
 
     activeCalls.delete(callId);
-    console.log(`[Call Rejected] Call ${callId} declined by receiver`);
+    console.log(`[Call Declined] Call ${callId} rejected by receiver`);
 
-    const rejectPayload = {
+    io.to(`user:${call.initiatorUsername}`).emit('call-rejected', {
       callId,
       reason: 'DECLINED',
-      message: 'Receiver declined the call'
-    };
-
-    io.to(call.initiatorId).emit('call-rejected', rejectPayload);
+      message: 'Friend declined the call'
+    });
   });
 
-  // WebRTC Signaling Relays
-  socket.on('webrtc-offer', ({ targetUserId, offer, callId }) => {
-    const fromUserId = socketToUserId.get(socket.id);
-    const normTarget = normalizeId(targetUserId);
-    io.to(normTarget).emit('webrtc-offer', { fromUserId, offer, callId });
+  // WebRTC Relays
+  socket.on('webrtc-offer', ({ targetUsername, offer, callId }) => {
+    const fromUsername = socketToUser.get(socket.id);
+    io.to(`user:${cleanUsername(targetUsername)}`).emit('webrtc-offer', { fromUsername, offer, callId });
   });
 
-  socket.on('webrtc-answer', ({ targetUserId, answer, callId }) => {
-    const fromUserId = socketToUserId.get(socket.id);
-    const normTarget = normalizeId(targetUserId);
-    io.to(normTarget).emit('webrtc-answer', { fromUserId, answer, callId });
+  socket.on('webrtc-answer', ({ targetUsername, answer, callId }) => {
+    const fromUsername = socketToUser.get(socket.id);
+    io.to(`user:${cleanUsername(targetUsername)}`).emit('webrtc-answer', { fromUsername, answer, callId });
   });
 
-  socket.on('ice-candidate', ({ targetUserId, candidate, callId }) => {
-    const fromUserId = socketToUserId.get(socket.id);
-    const normTarget = normalizeId(targetUserId);
-    io.to(normTarget).emit('ice-candidate', { fromUserId, candidate, callId });
+  socket.on('ice-candidate', ({ targetUsername, candidate, callId }) => {
+    const fromUsername = socketToUser.get(socket.id);
+    io.to(`user:${cleanUsername(targetUsername)}`).emit('ice-candidate', { fromUsername, candidate, callId });
   });
 
-  // Relay Mute / Camera state
+  // Media Mute / Cam Relay
   socket.on('peer-media-state', ({ isAudioMuted, isVideoMuted }) => {
-    const fromUserId = socketToUserId.get(socket.id);
-    const user = connectedUsers.get(fromUserId);
+    const fromUsername = socketToUser.get(socket.id);
+    const user = connectedUsers.get(fromUsername);
     if (!user || !user.activeCallId) return;
 
     const call = activeCalls.get(user.activeCallId);
     if (call) {
-      call.participants.forEach(pid => {
-        if (pid !== fromUserId) {
-          const peer = connectedUsers.get(pid);
-          const payload = {
-            userId: fromUserId,
-            displayId: user.displayId,
+      call.participants.forEach(pUname => {
+        if (pUname !== fromUsername) {
+          io.to(`user:${pUname}`).emit('peer-media-state-updated', {
+            username: fromUsername,
             isAudioMuted,
             isVideoMuted
-          };
-          io.to(pid).emit('peer-media-state-updated', payload);
-          if (peer?.socketId) {
-            io.to(peer.socketId).emit('peer-media-state-updated', payload);
-          }
+          });
         }
       });
     }
   });
 
-  // External Interruption
-  socket.on('external-interruption', ({ isInterrupted, reason }) => {
-    const userId = socketToUserId.get(socket.id);
-    const user = connectedUsers.get(userId);
-    if (!user) return;
-
-    user.inExternalCall = isInterrupted;
-    console.log(`[Interruption] ID #${user.displayId} interrupted: ${isInterrupted} (${reason})`);
-
-    if (user.activeCallId) {
-      const call = activeCalls.get(user.activeCallId);
-      if (call) {
-        call.participants.forEach(pid => {
-          if (pid !== userId) {
-            const peer = connectedUsers.get(pid);
-            const payload = {
-              callId: user.activeCallId,
-              userId,
-              displayId: user.displayId,
-              isHeld: isInterrupted,
-              reason: reason || 'External app has audio focus'
-            };
-            io.to(pid).emit('peer-hold-state', payload);
-            if (peer?.socketId) {
-              io.to(peer.socketId).emit('peer-hold-state', payload);
-            }
-          }
-        });
-      }
-    }
-
-    broadcastOnlineUsers();
-  });
-
   // End Call
   socket.on('end-call', ({ callId }) => {
-    endCallSession(callId, socketToUserId.get(socket.id));
+    endCallSession(callId, socketToUser.get(socket.id));
   });
 
   // Disconnect
   socket.on('disconnect', (reason) => {
-    const userId = socketToUserId.get(socket.id);
-    socketToUserId.delete(socket.id);
-    if (!userId) return;
+    const uName = socketToUser.get(socket.id);
+    socketToUser.delete(socket.id);
+    if (!uName) return;
 
-    console.log(`[Socket Disconnected] Socket ${socket.id} for ID #${userId}. Reason: ${reason}`);
+    console.log(`[Socket Disconnected] @${uName}. Reason: ${reason}`);
 
-    const user = connectedUsers.get(userId);
+    const user = connectedUsers.get(uName);
     if (user && user.socketId === socket.id) {
-      const room = io.sockets.adapter.rooms.get(userId);
+      const room = io.sockets.adapter.rooms.get(`user:${uName}`);
       if (!room || room.size === 0) {
-        console.log(`[User Offline] ID #${user.displayId || userId} has left.`);
         if (user.activeCallId) {
-          endCallSession(user.activeCallId, userId);
+          endCallSession(user.activeCallId, uName);
         }
-        connectedUsers.delete(userId);
+        connectedUsers.delete(uName);
         broadcastOnlineUsers();
-        broadcastFriendsStatusUpdate(userId);
-      } else {
-        const activeSockets = Array.from(room);
-        if (activeSockets.length > 0) {
-          user.socketId = activeSockets[0];
-          socketToUserId.set(user.socketId, userId);
-        }
+        broadcastFriendsStatusUpdate(uName);
       }
     }
   });
@@ -953,79 +805,65 @@ function clearCallTimeout(callId) {
   }
 }
 
-function endCallSession(callId, endedByUserId) {
+function endCallSession(callId, endedByUsername) {
   clearCallTimeout(callId);
   const call = activeCalls.get(callId);
   if (!call) return;
 
   console.log(`[Call Ended] Session ${callId} ended`);
 
-  call.participants.forEach(pid => {
-    const u = connectedUsers.get(pid);
-    if (u) {
-      if (u.activeCallId === callId) {
-        u.activeCallId = null;
-      }
-      if (u.socketId) {
-        io.to(u.socketId).emit('call-ended', {
-          callId,
-          endedBy: endedByUserId
-        });
-      }
+  call.participants.forEach(pUname => {
+    const u = connectedUsers.get(pUname);
+    if (u && u.activeCallId === callId) {
+      u.activeCallId = null;
     }
-    io.to(pid).emit('call-ended', {
+    io.to(`user:${pUname}`).emit('call-ended', {
       callId,
-      endedBy: endedByUserId
+      endedBy: endedByUsername
     });
-    broadcastFriendsStatusUpdate(pid);
+    broadcastFriendsStatusUpdate(pUname);
   });
 
   activeCalls.delete(callId);
   broadcastOnlineUsers();
 }
 
-function broadcastFriendsStatusUpdate(userNormId) {
-  const user = findUserByNormId(userNormId);
+function broadcastFriendsStatusUpdate(username) {
+  const user = findUserByUsername(username);
   if (!user || !user.friends) return;
 
-  user.friends.forEach(friendNormId => {
-    if (connectedUsers.has(friendNormId)) {
-      io.to(friendNormId).emit('friends-data-updated', getPopulatedFriendsData(friendNormId));
+  user.friends.forEach(fUname => {
+    if (connectedUsers.has(fUname)) {
+      io.to(`user:${fUname}`).emit('friends-data-updated', getPopulatedFriendsData(fUname));
     }
   });
 }
 
 function broadcastOnlineUsers() {
   const users = Array.from(connectedUsers.values()).map(u => ({
-    userId: u.uniqueId,
-    displayId: u.displayId,
+    username: u.username,
     name: u.name,
     email: u.email,
     avatar: u.avatar,
-    inCall: Boolean(u.activeCallId),
-    activeCallId: u.activeCallId,
-    inExternalCall: u.inExternalCall
+    inCall: Boolean(u.activeCallId)
   }));
   io.emit('online-users-updated', users);
 }
 
 function emitOnlineUsersTo(socket) {
   const users = Array.from(connectedUsers.values()).map(u => ({
-    userId: u.uniqueId,
-    displayId: u.displayId,
+    username: u.username,
     name: u.name,
     email: u.email,
     avatar: u.avatar,
-    inCall: Boolean(u.activeCallId),
-    activeCallId: u.activeCallId,
-    inExternalCall: u.inExternalCall
+    inCall: Boolean(u.activeCallId)
   }));
   socket.emit('online-users-updated', users);
 }
 
 server.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`🚀 CallPulse Server: Email & Google Login + Friends Calling`);
+  console.log(`👻 SnapCall Server: Snapchat-Style HD Video Calling`);
   console.log(`📍 URL: http://localhost:${PORT}`);
   console.log(`====================================================`);
 });

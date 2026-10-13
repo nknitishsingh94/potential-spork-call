@@ -3,518 +3,424 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CallPulse | Direct HD Calling & Friends Network</title>
-  <meta name="description" content="Secure, direct audio and video calling with mutual friend verification, email & Google sign-in, and zero-busy connection architecture.">
+  <title>SnapCall | Snapchat-Style HD Video Calling</title>
+  <meta name="description" content="Instant Snapchat-style video and voice calling with Bitmoji profiles, mutual friend verification, and full-screen immersive video stage.">
 
-  <!-- Modern Typography: Outfit (Headings) & Plus Jakarta Sans (UI/Body) -->
+  <!-- Typography: Outfit (Headlines) & Plus Jakarta Sans (UI) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
   
-  <!-- Google Identity Services for Google Login -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="stylesheet" href="style.css?v=30">
 </head>
-<body class="light-theme">
+<body class="snap-theme">
 
-  <div class="app-shell">
+  <div class="snap-shell">
     
-    <!-- Top Header: Modern Glass Navbar -->
-    <header class="app-header">
+    <!-- Top Header (Snapchat Style Bar) -->
+    <header class="snap-header">
       <div class="brand">
-        <div class="brand-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+        <div class="snap-ghost-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C7.58 2 4 5.58 4 10c0 2.24.91 4.26 2.39 5.72-.25.86-.88 2.28-2.39 3.28 2.05.28 4.14-.52 5.37-1.45.83.29 1.71.45 2.63.45 4.42 0 8-3.58 8-8s-3.58-8-8-8zm-2.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/>
           </svg>
         </div>
-        <div>
-          <h1>Call<span>Pulse</span></h1>
-          <p class="subtitle">Direct HD Calling • Mutual Friend Verification • Zero-Busy Engine</p>
+        <div class="brand-text-wrap">
+          <h1>Snap<span>Call</span></h1>
+          <p class="tagline">Friends Video Calling</p>
         </div>
       </div>
 
-      <!-- Right Header: User Profile HUD or Sign In Button -->
+      <!-- Right Header Profile / Auth -->
       <div class="header-right-group">
-        <!-- Logged-in Profile Capsule -->
-        <div class="user-profile-capsule" id="userProfileCapsule" style="display: none;">
-          <div class="profile-info-wrap">
-            <img id="headerUserAvatar" class="profile-avatar-img" src="" alt="Avatar" style="display: none;">
-            <div id="headerUserAvatarPlaceholder" class="profile-avatar-fallback">👤</div>
-            <div class="profile-text-meta">
-              <span class="profile-user-name" id="headerUserName">Loading...</span>
-              <span class="profile-user-email" id="headerUserEmail">user@example.com</span>
-            </div>
+        <!-- Logged-in User Pill -->
+        <div class="snap-user-capsule" id="userProfileCapsule" style="display: none;">
+          <div class="avatar-ring-wrap">
+            <img id="headerUserAvatar" class="snap-user-avatar" src="" alt="Bitmoji" style="display: none;">
+            <div id="headerUserAvatarPlaceholder" class="snap-avatar-fallback">👻</div>
+            <span class="active-badge-dot"></span>
           </div>
-
-          <!-- Permanent Caller ID Pill -->
-          <div class="my-id-card">
-            <div class="id-meta">
-              <span class="id-label">MY CALLER ID:</span>
-              <span class="id-digits" id="myDisplayId">--- ---</span>
-            </div>
-            <button id="copyIdBtn" class="btn-copy" title="Copy your permanent Caller ID">
-              <span>📋</span> Copy
-            </button>
-            <button id="shareLinkBtn" class="btn-copy btn-share" title="Share direct call link">
-              <span>🔗</span> Share
-            </button>
+          <div class="user-meta-text">
+            <span class="user-display-name" id="headerUserName">Loading...</span>
+            <span class="user-handle-tag" id="headerUserHandle">@username</span>
           </div>
-
-          <button id="logoutBtn" class="btn-logout" title="Sign out of your account">🚪 Sign Out</button>
+          <button id="logoutBtn" class="btn-snap-icon-ghost" title="Sign out of account">🚪</button>
         </div>
 
-        <!-- Guest / Logged-out Action -->
+        <!-- Logged-out Action -->
         <div class="guest-auth-actions" id="guestAuthActions">
-          <button id="openAuthModalBtn" class="btn-primary-auth">
-            <span>🔐</span> Sign In / Create Account
+          <button id="openAuthModalBtn" class="btn-snap-yellow">
+            <span>👻</span> Sign In with Snapchat
           </button>
         </div>
       </div>
     </header>
 
-    <!-- Real-time Connection Status Banner -->
-    <div id="connectionNoticeBanner" class="status-banner">
-      <div class="status-banner-left">
-        <span id="networkStatusDot" class="status-dot-pulse"></span>
-        <span id="networkStatusText"><b>Server Connected:</b> Ready for real-time calling</span>
-      </div>
-      <div id="securityBadge" class="security-badge">
-        🔒 Friends-Only Calling Protection Active
-      </div>
-    </div>
-
     <!-- Main Workspace -->
-    <main class="main-content">
+    <main class="snap-main-stage">
       
-      <!-- Left Sidebar: Friends Network, Requests & Direct Dial -->
-      <aside class="sidebar">
+      <!-- Left Drawer: Snapchat Friends & Chat Feed -->
+      <aside class="snap-feed-sidebar">
 
-        <!-- Sidebar Navigation Tabs -->
-        <nav class="sidebar-tabs">
-          <button class="sidebar-tab active" id="tabBtnFriends" data-tab="friends">
-            <span>👥</span> Friends <span class="tab-badge" id="friendsCountBadge">0</span>
+        <!-- Search Friends Input -->
+        <div class="snap-search-bar">
+          <span class="search-icon">🔍</span>
+          <input 
+            type="text" 
+            id="friendSearchInput" 
+            placeholder="Search friends or add @username..."
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button id="searchActionBtn" class="search-clear-btn" title="Search">➜</button>
+        </div>
+
+        <!-- Quick Active Stories / Friends Row -->
+        <div class="quick-stories-row" id="quickStoriesRow">
+          <div class="story-item my-story">
+            <div class="story-ring story-ring-add" id="myStoryRing">
+              <span class="story-add-icon">➕</span>
+            </div>
+            <span class="story-label">Add Friend</span>
+          </div>
+          <div id="activeFriendsStoryList" class="stories-friend-stream"></div>
+        </div>
+
+        <!-- Feed Tabs (Friends vs Added Me) -->
+        <div class="snap-feed-tabs">
+          <button class="snap-feed-tab active" id="tabFeedFriends">
+            <span>👥</span> Friends <span class="tab-count" id="friendsCountBadge">0</span>
           </button>
-          <button class="sidebar-tab" id="tabBtnRequests" data-tab="requests">
-            <span>📥</span> Requests <span class="tab-badge badge-alert" id="requestsCountBadge" style="display: none;">0</span>
+          <button class="snap-feed-tab" id="tabFeedRequests">
+            <span>💌</span> Added Me <span class="tab-count badge-yellow" id="requestsCountBadge" style="display: none;">0</span>
           </button>
-          <button class="sidebar-tab" id="tabBtnAdd" data-tab="add">
-            <span>➕</span> Add Friend
+          <button class="snap-feed-tab" id="tabFeedAdd">
+            <span>➕</span> Add
           </button>
-          <button class="sidebar-tab" id="tabBtnDial" data-tab="dial">
-            <span>📞</span> Dial
-          </button>
-        </nav>
+        </div>
 
         <!-- TAB 1: FRIENDS LIST -->
-        <div class="tab-pane active" id="tabPaneFriends">
-          <div class="sidebar-card friends-card">
-            <div class="card-header">
-              <h3>👥 My Accepted Friends</h3>
-              <button id="refreshFriendsBtn" class="btn-icon-xs" title="Refresh friends list">🔄</button>
-            </div>
-            <p class="card-desc">
-              Only accepted friends can call each other. Click 📹 or 🎙️ to start calling:
-            </p>
-
-            <div class="friends-list" id="friendsListContainer">
-              <div class="empty-state-card" id="friendsEmptyState">
-                <div class="empty-icon">🤝</div>
-                <b>No friends added yet</b>
-                <p>Add friends using their Email or Caller ID to start calling.</p>
-                <button id="emptyGoToAddFriendBtn" class="btn-sm-primary">➕ Add Your First Friend</button>
-              </div>
+        <div class="snap-tab-pane active" id="feedPaneFriends">
+          <div class="snap-friends-stream" id="friendsListContainer">
+            <div class="snap-empty-feed" id="friendsEmptyState">
+              <div class="empty-ghost-anim">👻</div>
+              <h3>No Friends Yet</h3>
+              <p>Add friends by their <b>@username</b> or email to start Snapchat video calling!</p>
+              <button id="btnEmptyAddFriends" class="btn-snap-yellow-sm">➕ Add Friends</button>
             </div>
           </div>
         </div>
 
-        <!-- TAB 2: FRIEND REQUESTS (RECEIVED & SENT) -->
-        <div class="tab-pane" id="tabPaneRequests">
-          <!-- Received Requests -->
-          <div class="sidebar-card requests-card">
-            <div class="card-header">
-              <h3>📥 Received Requests</h3>
-              <span class="badge badge-accent" id="receivedCountBadge">0 Pending</span>
+        <!-- TAB 2: ADDED ME (REQUESTS) -->
+        <div class="snap-tab-pane" id="feedPaneRequests">
+          <div class="requests-section">
+            <div class="section-title">
+              <span>Added You</span>
+              <small id="receivedCountLabel">0 pending</small>
             </div>
-            <p class="card-desc">
-              People who want to add you as a friend. Accept to allow calls:
-            </p>
-
-            <div class="requests-list" id="receivedRequestsList">
-              <div class="empty-state-sm">No incoming friend requests right now.</div>
+            <div class="requests-stream" id="receivedRequestsList">
+              <div class="empty-requests-notice">No pending requests right now.</div>
             </div>
           </div>
 
-          <!-- Sent Requests -->
-          <div class="sidebar-card requests-card">
-            <div class="card-header">
-              <h3>📤 Sent Requests</h3>
-              <span class="badge badge-gray" id="sentCountBadge">0 Sent</span>
+          <div class="requests-section" style="margin-top: 1rem;">
+            <div class="section-title">
+              <span>Pending Acceptance</span>
+              <small id="sentCountLabel">0 sent</small>
             </div>
-            <p class="card-desc">
-              Awaiting acceptance from these users:
-            </p>
-
-            <div class="requests-list" id="sentRequestsList">
-              <div class="empty-state-sm">No pending sent requests.</div>
+            <div class="requests-stream" id="sentRequestsList">
+              <div class="empty-requests-notice">No sent requests.</div>
             </div>
           </div>
         </div>
 
-        <!-- TAB 3: ADD FRIEND BY EMAIL OR CALLER ID -->
-        <div class="tab-pane" id="tabPaneAdd">
-          <div class="sidebar-card add-friend-card">
-            <div class="card-header">
-              <h3>➕ Send Friend Request</h3>
-              <span class="badge badge-accent">Search & Add</span>
-            </div>
-            <p class="card-desc">
-              Enter the <b>Email</b> or <b>6-digit Caller ID</b> of the person you want to add:
-            </p>
-
-            <div class="search-input-wrap">
+        <!-- TAB 3: ADD FRIEND SEARCH -->
+        <div class="snap-tab-pane" id="feedPaneAdd">
+          <div class="snap-add-card">
+            <h4>Add by Username or Email</h4>
+            <p>Enter anyone's Snapchat <b>@username</b> or email to send a request:</p>
+            
+            <div class="add-search-input-wrap">
               <input 
                 type="text" 
                 id="addFriendInput" 
-                placeholder="e.g. friend@gmail.com or 842-195" 
+                placeholder="e.g. @alex or alex@gmail.com"
                 autocomplete="off"
                 spellcheck="false"
               >
-              <button id="searchFriendBtn" class="btn-search">Search 🔍</button>
+              <button id="sendAddSearchBtn" class="btn-snap-add">Add ➕</button>
             </div>
 
-            <!-- Search Result Preview Card -->
-            <div class="search-result-card" id="searchResultCard" style="display: none;">
-              <div class="result-user-info">
-                <div class="result-avatar" id="resultAvatar">👤</div>
-                <div>
+            <!-- Search Result Card -->
+            <div class="search-user-card" id="searchResultCard" style="display: none;">
+              <div class="user-card-head">
+                <div class="user-bitmoji" id="resultAvatar">👻</div>
+                <div class="user-card-meta">
                   <h4 id="resultName">User Name</h4>
-                  <p id="resultEmail">email@example.com</p>
-                  <span class="result-id-tag" id="resultCallerId">ID: --- ---</span>
+                  <span id="resultUsername" class="user-handle">@username</span>
                 </div>
               </div>
-
-              <div class="result-action-bar">
-                <button id="sendRequestBtn" class="btn-send-request">
-                  <span>➕</span> Send Friend Request
-                </button>
-                <div id="resultStatusText" class="result-status-text" style="display: none;"></div>
-              </div>
-            </div>
-
-            <!-- Quick Tip Box -->
-            <div class="info-tip-box">
-              <span class="tip-icon">💡</span>
-              <p>Once they accept your request, both of you can make unlimited HD Video and Audio calls anytime!</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 4: DIRECT DIAL PAD (WITH FRIENDSHIP VALIDATION) -->
-        <div class="tab-pane" id="tabPaneDial">
-          <div class="sidebar-card dial-card">
-            <div class="card-header">
-              <h3>📞 Call by Caller ID</h3>
-              <span class="badge badge-accent">Direct Dial</span>
-            </div>
-            <p class="card-desc">
-              Enter the Caller ID of any accepted friend to call immediately:
-            </p>
-
-            <div class="dial-input-wrap">
-              <input 
-                type="text" 
-                id="targetIdInput" 
-                placeholder="e.g. 583-912" 
-                maxlength="10" 
-                autocomplete="off"
-                spellcheck="false"
-              >
-            </div>
-
-            <!-- Dual Call Buttons: Video vs Audio -->
-            <div class="dial-action-grid">
-              <button id="startVideoCallBtn" class="btn-dial btn-video">
-                <span class="btn-icon">📹</span>
-                <div class="dial-btn-text">
-                  <b>Video Call</b>
-                  <small>Camera & Voice</small>
-                </div>
+              <button id="sendRequestBtn" class="btn-snap-confirm-add">
+                ➕ Add Friend
               </button>
-
-              <button id="startAudioCallBtn" class="btn-dial btn-audio">
-                <span class="btn-icon">🎙️</span>
-                <div class="dial-btn-text">
-                  <b>Audio Call</b>
-                  <small>Voice Only</small>
-                </div>
-              </button>
+              <div id="resultStatusText" class="result-status-msg" style="display: none;"></div>
             </div>
 
-            <div class="friends-only-notice">
-              <span>🔒</span> Calls are protected. Calling a non-friend will automatically offer to send a friend request.
-            </div>
-          </div>
-        </div>
-
-        <!-- Dynamic Live Incoming Call Card in Sidebar -->
-        <div class="sidebar-card live-incoming-card" id="sidebarIncomingCard">
-          <div class="card-header">
-            <h3>📥 Live Incoming Call</h3>
-            <span class="badge badge-success" id="sidebarIncomingStatusBadge">🟢 Ready</span>
-          </div>
-
-          <!-- State 1: Idle (Waiting for Calls) -->
-          <div id="sidebarIncomingIdleState" class="incoming-idle-state">
-            <div class="incoming-idle-icon">📡</div>
-            <p class="incoming-idle-title">Listening for Incoming Calls</p>
-            <p class="incoming-idle-desc">
-              When an accepted friend calls your ID (<b id="sidebarIncomingMyIdBadge">#---</b>), their call will ring here in real-time!
-            </p>
-          </div>
-
-          <!-- State 2: Active Incoming Call (Ringing Right Now!) -->
-          <div id="sidebarIncomingActiveState" class="incoming-active-state" style="display: none;">
-            <div class="incoming-pulse-box">
-              <span class="incoming-ring-bell">🔔</span>
-              <div class="incoming-active-info">
-                <span class="incoming-badge-tag">INCOMING CALL RINGING...</span>
-                <h4 id="sidebarIncomingCallerId" class="incoming-active-caller">Friend Calling</h4>
-                <p id="sidebarIncomingCallerEmail" class="incoming-active-email" style="font-size: 0.78rem; color: #475569;"></p>
-                <span id="sidebarIncomingCallType" class="incoming-active-type">📹 Video Call</span>
-              </div>
-            </div>
-            
-            <div class="sidebar-incoming-actions">
-              <button id="sidebarAcceptCallBtn" class="btn-sidebar-accept">📞 Answer Call</button>
-              <button id="sidebarDeclineCallBtn" class="btn-sidebar-decline">❌ Decline</button>
+            <div class="snap-tip-pill">
+              <span>💡</span> Both of you must accept before video calls can connect.
             </div>
           </div>
         </div>
 
       </aside>
 
-      <!-- Center & Right Workspace: Video Grid & Call HUD -->
-      <section class="stage-section">
+      <!-- Center Stage: Snapchat Fullscreen Immersive Video Screen -->
+      <section class="snap-video-stage" id="snapVideoStage">
         
-        <!-- Call Status HUD -->
-        <div class="stage-header">
-          <div class="stage-title-wrap">
-            <h2 id="stageStatusTitle">Ready to Call</h2>
-            <span class="status-indicator-tag" id="stageStatusTag">Idle</span>
+        <!-- Video Canvas Frame -->
+        <div class="immersive-video-frame" id="immersiveVideoFrame">
+          
+          <!-- Remote Friend Video (Full Screen Background) -->
+          <video id="remoteVideo" class="remote-video-fullscreen" autoplay playsinline style="display: none;"></video>
+          
+          <!-- Idle Stage Placeholder (When No Call is Active) -->
+          <div class="stage-idle-canvas" id="stageIdleCanvas">
+            <div class="idle-bitmoji-hero">
+              <div class="pulse-aura"></div>
+              <div class="hero-ghost-circle">👻</div>
+            </div>
+            <h2>Ready to Video Call</h2>
+            <p>Select any friend from your list to start an instant HD video call.</p>
+            <div class="snap-feature-tags">
+              <span class="snap-tag">🔒 Friends Only</span>
+              <span class="snap-tag">📹 Fullscreen HD</span>
+              <span class="snap-tag">⚡ Zero-Busy Ringing</span>
+            </div>
           </div>
 
-          <div class="stage-meta-controls">
-            <div class="call-type-indicator" id="callTypeIndicator" style="display: none;">
-              <span id="callTypeBadge">📹 VIDEO</span>
+          <!-- Remote Audio-Only Avatar Fallback -->
+          <div class="remote-audio-hero" id="remoteAudioOnlyAvatar" style="display: none;">
+            <div class="audio-pulse-ring"></div>
+            <div class="audio-avatar-circle" id="remoteAudioAvatar">👤</div>
+            <h3 id="remoteAudioName">Friend Voice Active</h3>
+            <span class="audio-tag">Voice Call Active</span>
+          </div>
+
+          <!-- Top Video Overlay HUD (Friend Info & Duration) -->
+          <div class="video-top-hud" id="videoTopHud" style="display: none;">
+            <div class="friend-pill-hud">
+              <div class="hud-avatar" id="hudFriendAvatar">👤</div>
+              <div class="hud-meta">
+                <span class="hud-name" id="hudFriendName">Friend</span>
+                <span class="hud-timer" id="callTimer">00:00</span>
+              </div>
             </div>
-            <div class="call-timer" id="callTimer" style="display: none;">00:00</div>
-            <button id="headerFullscreenBtn" class="btn-icon-square" title="Full Screen">
-              <span id="headerFullscreenIcon">⛶</span>
+            <div class="hud-right-actions">
+              <span class="hud-quality-badge">⚡ Live 1080p</span>
+              <button id="headerFullscreenBtn" class="hud-icon-btn" title="Full Screen">⛶</button>
+            </div>
+          </div>
+
+          <!-- Floating Local Camera (Picture-in-Picture Bubble) -->
+          <div class="pip-local-camera" id="pipLocalCamera">
+            <video id="localVideo" class="pip-video" autoplay playsinline muted></video>
+            
+            <!-- Local Avatar Fallback when Camera is Off -->
+            <div class="pip-avatar-fallback" id="localAvatarFallback" style="display: none;">
+              <span id="localAvatarLetter">Y</span>
+            </div>
+
+            <div class="pip-tag">
+              <span id="pipLabel">You</span>
+            </div>
+          </div>
+
+          <!-- Floating Bottom Snapchat Control Capsule -->
+          <div class="snap-control-capsule" id="snapControlCapsule">
+            <!-- Mute Mic -->
+            <button id="toggleMicBtn" class="snap-ctrl-btn" title="Mute Microphone">
+              <span class="ctrl-icon" id="micBtnIcon">🎤</span>
+            </button>
+
+            <!-- Camera Toggle -->
+            <button id="toggleCamBtn" class="snap-ctrl-btn" title="Turn Camera Off / On">
+              <span class="ctrl-icon" id="camBtnIcon">📹</span>
+            </button>
+
+            <!-- End Call (Prominent Red Circular Hangup) -->
+            <button id="endCallBtn" class="snap-ctrl-btn btn-hangup" title="End Call">
+              <span class="ctrl-icon">📞</span>
+            </button>
+
+            <!-- Speaker Mute -->
+            <button id="toggleSpeakerBtn" class="snap-ctrl-btn" title="Sound Mute">
+              <span class="ctrl-icon" id="speakerBtnIcon">🔊</span>
+            </button>
+
+            <!-- Screen Share -->
+            <button id="shareScreenBtn" class="snap-ctrl-btn" title="Share Screen">
+              <span class="ctrl-icon">🖥️</span>
+            </button>
+
+            <!-- Fullscreen -->
+            <button id="toggleFullscreenBtn" class="snap-ctrl-btn" title="Full Screen">
+              <span class="ctrl-icon">⛶</span>
             </button>
           </div>
-        </div>
-
-        <!-- Active Video / Audio Grid -->
-        <div class="video-grid" id="videoGrid">
-          
-          <!-- Local User Stream Card -->
-          <div class="video-card local-card" id="localVideoContainer">
-            <video id="localVideo" autoplay playsinline muted></video>
-            
-            <!-- Audio-only fallback representation -->
-            <div class="audio-only-avatar" id="localAudioOnlyAvatar" style="display: none;">
-              <div class="audio-ring-pulse"></div>
-              <div class="audio-id-badge" id="localAudioIdBadge">YOU</div>
-              <span>Audio Call Active</span>
-            </div>
-
-            <div class="video-overlay">
-              <span class="user-tag" id="localUserTag">ID: You</span>
-              <div class="stream-badges">
-                <span class="stream-badge" id="localMicBadge">🎙️ Mic On</span>
-                <span class="stream-badge" id="localCamBadge">📹 Cam On</span>
-              </div>
-            </div>
-
-            <!-- Interruption overlay -->
-            <div class="interruption-overlay" id="localInterruptionOverlay" style="display: none;">
-              <div class="interruption-content">
-                <span class="interruption-icon">⏸️</span>
-                <p>Call Paused / On Hold</p>
-                <small>Session active • Zero-Busy guarantee</small>
-              </div>
-            </div>
-
-            <!-- Camera Permission & Enable Prompt Overlay -->
-            <div class="camera-prompt-overlay" id="cameraPromptOverlay" style="display: none;">
-              <div class="camera-prompt-card">
-                <span class="prompt-icon">📷</span>
-                <b id="cameraPromptTitle">Camera Not Active</b>
-                <p id="cameraPromptDesc">Click below to allow browser access to your physical webcam:</p>
-                <div class="camera-prompt-actions">
-                  <button id="turnOnCameraBtn" class="btn-turn-on-cam">📷 Turn On Real Camera</button>
-                  <button id="dismissCameraPromptBtn" class="btn-dismiss-cam">Dismiss</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Remote Stream Card (Placeholder when idle, Video when in call) -->
-          <div class="video-card remote-card empty-remote" id="remotePlaceholder">
-            <video id="remoteVideo" autoplay playsinline style="display: none; width: 100%; height: 100%; object-fit: cover;"></video>
-            
-            <div class="empty-video-placeholder" id="remoteEmptyPlaceholder">
-              <div class="placeholder-icon">📞</div>
-              <h3>No Call Connected</h3>
-              <p>Select any friend from your <b>Friends List</b> or accept an incoming call.</p>
-              <div class="feature-pills">
-                <span class="pill">🔒 Friends-Only Protection</span>
-                <span class="pill">✔ 0% Busy Tone</span>
-                <span class="pill">✔ Instant Ringing</span>
-                <span class="pill">✔ HD 1080p WebRTC</span>
-              </div>
-            </div>
-
-            <!-- Remote Audio Avatar Fallback -->
-            <div class="audio-only-avatar" id="remoteAudioOnlyAvatar" style="display: none;">
-              <div class="audio-ring-pulse"></div>
-              <div class="audio-id-badge" id="remoteAudioIdBadge">FRIEND</div>
-              <span id="remoteAudioName">Friend Voice Active</span>
-            </div>
-
-            <!-- Remote Overlay Tags -->
-            <div class="video-overlay" id="remoteVideoOverlay" style="display: none;">
-              <span class="user-tag" id="remoteUserTag">Friend</span>
-              <div class="stream-badges">
-                <span class="stream-badge" id="remoteMicBadge">🎙️ Mic On</span>
-                <span class="stream-badge" id="remoteCamBadge">📹 Cam On</span>
-              </div>
-            </div>
-          </div>
 
         </div>
 
-        <!-- Persistent Floating Control Bar (Mute Mic, Speaker Mute, Video, Screen Share, Fullscreen, End Call) -->
-        <div class="call-control-bar" id="callControlBar">
-          <!-- Mute/Unmute Mic Button -->
-          <button id="toggleMicBtn" class="control-btn" title="Mute / Unmute Your Microphone">
-            <span class="icon" id="micBtnIcon">🎤</span>
-            <span class="btn-label" id="micBtnLabel">Mute Mic</span>
-          </button>
-
-          <!-- Speaker Mute Button (Mute Other Person's Voice) -->
-          <button id="toggleSpeakerBtn" class="control-btn" title="Mute Incoming Sound (Speaker)">
-            <span class="icon" id="speakerBtnIcon">🔊</span>
-            <span class="btn-label" id="speakerBtnLabel">Sound On</span>
-          </button>
-
-          <!-- Toggle Camera Button -->
-          <button id="toggleCamBtn" class="control-btn" title="Turn Camera Off / On">
-            <span class="icon" id="camBtnIcon">📹</span>
-            <span class="btn-label" id="camBtnLabel">Video</span>
-          </button>
-
-          <!-- Screen Share Button -->
-          <button id="shareScreenBtn" class="control-btn" title="Share your screen">
-            <span class="icon" id="shareScreenIcon">🖥️</span>
-            <span class="btn-label">Share Screen</span>
-          </button>
-
-          <!-- Fullscreen Button -->
-          <button id="toggleFullscreenBtn" class="control-btn" title="Full Screen Video">
-            <span class="icon" id="fullscreenBtnIcon">⛶</span>
-            <span class="btn-label">Full Screen</span>
-          </button>
-
-          <!-- End Call Button (Visible only when in active call) -->
-          <button id="endCallBtn" class="control-btn btn-danger" title="End Call" style="display: none;">
-            <span class="icon">🛑</span>
-            <span class="btn-label">End Call</span>
-          </button>
-        </div>
-
-        <!-- Technical Event Log -->
-        <div class="debug-panel">
-          <div class="debug-header">
-            <h4>📡 Real-time Signaling & Media Event Log</h4>
-            <button id="clearLogsBtn" class="btn-xs">Clear</button>
+        <!-- Technical Signaling Logs (Collapsible) -->
+        <div class="snap-debug-box">
+          <div class="debug-head">
+            <span>📡 Real-Time WebRTC Mesh & Signaling</span>
+            <button id="clearLogsBtn" class="debug-clear-btn">Clear</button>
           </div>
-          <div class="debug-logs" id="debugLogs">
-            <div class="log-entry log-system">[INIT] System ready. Friends-protected calling engine active.</div>
+          <div class="debug-entries" id="debugLogs">
+            <div class="log-entry log-system">[INIT] SnapCall Friends Engine Ready.</div>
           </div>
         </div>
 
       </section>
+
     </main>
 
     <!-- ========================================== -->
-    <!-- AUTHENTICATION MODAL (EMAIL & GOOGLE) -->
+    <!-- SNAPCHAT-STYLE OUTGOING CALL OVERLAY -->
     <!-- ========================================== -->
-    <div class="modal-backdrop" id="authModal" style="display: none;">
-      <div class="auth-dialog">
-        <div class="auth-header">
-          <div class="auth-brand-badge">
-            <span style="font-size: 1.5rem;">📞</span>
-          </div>
-          <h2>Welcome to CallPulse</h2>
-          <p>Sign in with your Email or Google account to access your friends network and make HD calls.</p>
+    <div class="snap-call-modal" id="outgoingCallModal" style="display: none;">
+      <div class="snap-call-dialog">
+        <div class="snap-calling-avatar-wrap">
+          <div class="calling-wave wave-1"></div>
+          <div class="calling-wave wave-2"></div>
+          <div class="calling-wave wave-3"></div>
+          <div class="calling-bitmoji-circle" id="outgoingTargetAvatar">👻</div>
         </div>
 
-        <!-- Auth Switch Tabs -->
-        <div class="auth-tabs">
-          <button class="auth-tab-btn active" id="authTabLogin">Sign In</button>
-          <button class="auth-tab-btn" id="authTabRegister">Create Account</button>
+        <h2 id="outgoingTargetName" class="calling-title">Calling Friend...</h2>
+        <span id="outgoingTargetHandle" class="calling-handle">@username</span>
+        <div class="calling-status-pill" id="outgoingStatusText">RINGING... 🔔</div>
+
+        <p class="calling-subtext">
+          Zero-busy guarantee: Even if friend is on another call, your call rings!
+        </p>
+
+        <button id="cancelOutgoingCallBtn" class="btn-snap-hangup-large" title="Cancel Call">
+          <span>❌</span> End Call
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SNAPCHAT-STYLE INCOMING CALL OVERLAY -->
+    <!-- ========================================== -->
+    <div class="snap-call-modal incoming-modal" id="incomingCallModal" style="display: none;">
+      <div class="snap-call-dialog incoming-dialog">
+        <div class="incoming-ring-anim">
+          <div class="ring-pulse pulse-1"></div>
+          <div class="ring-pulse pulse-2"></div>
+          <div class="incoming-bitmoji-circle" id="incomingCallerAvatar">👻</div>
         </div>
 
-        <!-- Alert Notice Box -->
-        <div id="authAlertBox" class="auth-alert" style="display: none;"></div>
+        <span class="incoming-badge-tag">INCOMING VIDEO CALL</span>
+        <h2 id="incomingCallerName" class="incoming-name">Friend Calling</h2>
+        <span id="incomingCallerHandle" class="incoming-handle">@username</span>
 
-        <!-- Form 1: Sign In -->
-        <form id="loginForm" class="auth-form" onsubmit="return false;">
-          <div class="form-group">
-            <label for="loginEmail">Email Address</label>
-            <input type="email" id="loginEmail" placeholder="e.g. yourname@gmail.com" required autocomplete="email">
+        <p class="incoming-note">Verified friend is video calling you.</p>
+
+        <div class="incoming-action-pair">
+          <button id="acceptCallStandardBtn" class="btn-snap-answer">
+            <span class="action-icon">📹</span> Answer
+          </button>
+          <button id="declineCallBtn" class="btn-snap-decline">
+            <span class="action-icon">❌</span> Decline
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SNAPCHAT-STYLE NOT-FRIENDS BLOCK ALERT -->
+    <!-- ========================================== -->
+    <div class="snap-call-modal" id="notFriendsAlertModal" style="display: none;">
+      <div class="snap-call-dialog alert-dialog">
+        <div class="alert-ghost-circle">🔒</div>
+        <h3>Must Be Friends to Call</h3>
+        <p id="notFriendsAlertMsg">
+          On SnapCall, you can only video call users who have added you as a friend.
+        </p>
+
+        <div class="alert-actions">
+          <button id="alertSendRequestBtn" class="btn-snap-yellow" style="width: 100%; margin-bottom: 0.5rem;">
+            <span>➕</span> Add as Friend
+          </button>
+          <button id="alertDismissBtn" class="btn-snap-cancel" style="width: 100%;">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- AUTHENTICATION MODAL (SNAPCHAT SIGN IN) -->
+    <!-- ========================================== -->
+    <div class="snap-call-modal" id="authModal" style="display: none;">
+      <div class="snap-auth-dialog">
+        <div class="auth-ghost-icon">👻</div>
+        <h2>Sign in to SnapCall</h2>
+        <p>Connect with friends and start HD video calling in seconds.</p>
+
+        <div class="auth-tab-switch">
+          <button class="auth-tab-btn active" id="authTabLogin">Log In</button>
+          <button class="auth-tab-btn" id="authTabRegister">Sign Up</button>
+        </div>
+
+        <div id="authAlertBox" class="snap-auth-alert" style="display: none;"></div>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="snap-form" onsubmit="return false;">
+          <div class="form-field">
+            <label>Username or Email</label>
+            <input type="text" id="loginEmail" placeholder="e.g. @nitish or nitish@gmail.com" required autocomplete="username">
           </div>
-          <div class="form-group">
-            <label for="loginPassword">Password</label>
+          <div class="form-field">
+            <label>Password</label>
             <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
           </div>
-          <button type="submit" id="btnLoginSubmit" class="btn-auth-submit">
-            Sign In with Email ➜
+          <button type="submit" id="btnLoginSubmit" class="btn-snap-yellow-submit">
+            Log In ➜
           </button>
         </form>
 
-        <!-- Form 2: Create Account -->
-        <form id="registerForm" class="auth-form" style="display: none;" onsubmit="return false;">
-          <div class="form-group">
-            <label for="regName">Full Name</label>
+        <!-- Register Form -->
+        <form id="registerForm" class="snap-form" style="display: none;" onsubmit="return false;">
+          <div class="form-field">
+            <label>Full Name</label>
             <input type="text" id="regName" placeholder="e.g. Nitish Singh" required autocomplete="name">
           </div>
-          <div class="form-group">
-            <label for="regEmail">Email Address</label>
-            <input type="email" id="regEmail" placeholder="e.g. yourname@gmail.com" required autocomplete="email">
+          <div class="form-field">
+            <label>Pick a Username (@handle)</label>
+            <input type="text" id="regUsername" placeholder="e.g. nitish_singh" required autocomplete="username">
           </div>
-          <div class="form-group">
-            <label for="regPassword">Create Password (min 4 chars)</label>
+          <div class="form-field">
+            <label>Email Address</label>
+            <input type="email" id="regEmail" placeholder="e.g. nitish@gmail.com" required autocomplete="email">
+          </div>
+          <div class="form-field">
+            <label>Password</label>
             <input type="password" id="regPassword" placeholder="••••••••" required autocomplete="new-password">
           </div>
-          <button type="submit" id="btnRegisterSubmit" class="btn-auth-submit">
-            Create Account & Get Caller ID ➜
+          <button type="submit" id="btnRegisterSubmit" class="btn-snap-yellow-submit">
+            Sign Up & Get Started ➜
           </button>
         </form>
 
-        <div class="auth-divider">
-          <span>OR CONTINUE WITH</span>
-        </div>
+        <div class="form-divider"><span>OR</span></div>
 
-        <!-- Google Sign-In Actions -->
-        <div class="google-auth-section">
-          <!-- Google GIS container (if client ID is supplied) -->
-          <div id="googleGisButtonWrap" style="display: flex; justify-content: center; margin-bottom: 0.5rem;"></div>
-
-          <!-- Direct Styled Google Button -->
-          <button type="button" id="btnGoogleSignIn" class="btn-google-action">
+        <!-- Google Sign-In & Instant Demo Accounts -->
+        <div class="google-options">
+          <button type="button" id="btnGoogleSignIn" class="btn-google-snap">
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
               <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
@@ -524,167 +430,31 @@
             <span>Continue with Google</span>
           </button>
 
-          <!-- Quick Demo Account for instant local testing -->
-          <button type="button" id="btnQuickDemoLogin" class="btn-ghost-demo">
-            ⚡ Quick Demo Sign-In (Instant Local Test)
-          </button>
-        </div>
-
-        <div class="auth-footer-note">
-          🔒 Your account info and friends list are securely stored and synced in real-time.
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- GOOGLE ACCOUNT QUICK CHOOSER POPUP -->
-    <!-- ========================================== -->
-    <div class="modal-backdrop" id="googleChooserModal" style="display: none;">
-      <div class="google-chooser-dialog">
-        <div class="chooser-header">
-          <svg width="24" height="24" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
-            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.03 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-          </svg>
-          <h3>Sign in with Google</h3>
-          <p>Choose or enter your Google account to continue to CallPulse</p>
-        </div>
-
-        <div class="chooser-body">
-          <div class="form-group" style="text-align: left;">
-            <label for="googleCustomEmail">Google Email</label>
-            <input type="email" id="googleCustomEmail" placeholder="your.google@gmail.com" value="">
-          </div>
-          <div class="form-group" style="text-align: left;">
-            <label for="googleCustomName">Google Display Name</label>
-            <input type="text" id="googleCustomName" placeholder="Your Name" value="">
-          </div>
-          
-          <div class="preset-account-pills">
-            <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Or pick a test profile:</span>
-            <div class="pill-group">
-              <button class="account-pill-btn" onclick="document.getElementById('googleCustomEmail').value='nitish@gmail.com'; document.getElementById('googleCustomName').value='Nitish Singh';">
-                👤 Nitish Singh
-              </button>
-              <button class="account-pill-btn" onclick="document.getElementById('googleCustomEmail').value='alex@gmail.com'; document.getElementById('googleCustomName').value='Alex Kumar';">
-                👤 Alex Kumar
-              </button>
-              <button class="account-pill-btn" onclick="document.getElementById('googleCustomEmail').value='sarah@gmail.com'; document.getElementById('googleCustomName').value='Sarah Jenkins';">
-                👤 Sarah Jenkins
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="chooser-actions">
-          <button id="googleConfirmBtn" class="btn-confirm-google">Confirm Google Sign-In</button>
-          <button id="googleCancelBtn" class="btn-cancel-google">Cancel</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- NOT-FRIENDS BLOCK ALERT MODAL -->
-    <!-- ========================================== -->
-    <div class="modal-backdrop" id="notFriendsAlertModal" style="display: none;">
-      <div class="call-dialog alert-dialog">
-        <div class="alert-icon-ring">🔒</div>
-        <h3>Friends-Only Calling</h3>
-        <p id="notFriendsAlertMsg">
-          You can only call accepted friends. You must be friends with this user before making calls.
-        </p>
-
-        <div class="alert-action-box">
-          <button id="alertSendRequestBtn" class="btn-primary-auth" style="width: 100%; margin-bottom: 0.5rem;">
-            <span>➕</span> Send Friend Request Now
-          </button>
-          <button id="alertDismissBtn" class="btn-ghost-demo" style="width: 100%;">
-            Close
+          <button type="button" id="btnQuickDemoLogin" class="btn-snap-demo">
+            ⚡ Quick Demo Sign-In (@nitish / @alex)
           </button>
         </div>
       </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- MODAL: OUTGOING CALL (RINGING SCREEN) -->
-    <!-- ========================================== -->
-    <div class="modal-backdrop" id="outgoingCallModal" style="display: none;">
-      <div class="call-dialog outgoing-dialog">
-        <div class="calling-pulse">
-          <div class="pulse-ring"></div>
-          <div class="pulse-avatar" id="outgoingTargetAvatar">📞</div>
-        </div>
-        <h3 id="outgoingTargetName">Calling Friend...</h3>
-        <p id="outgoingTargetEmail" style="font-size: 0.82rem; color: #64748b; margin-top: -0.25rem;"></p>
-        <div class="call-badge-status" id="outgoingStatusBadge">
-          <span class="ring-icon">🔔</span> <span id="outgoingStatusText">RINGING...</span>
-        </div>
-        <p class="dialog-note" id="outgoingDialogNote">
-          Connecting call. Even if receiver is on another call, you get <b>RINGING</b> instead of Busy!
-        </p>
-        <button id="cancelOutgoingCallBtn" class="btn-danger btn-pill">Cancel Call</button>
-      </div>
-    </div>
+    <!-- Google Chooser Modal -->
+    <div class="snap-call-modal" id="googleChooserModal" style="display: none;">
+      <div class="snap-auth-dialog" style="max-width: 380px;">
+        <h3>Sign in with Google</h3>
+        <p>Enter your Google account details to sign in:</p>
 
-    <!-- ========================================== -->
-    <!-- TOP FLOATING HEADS-UP BANNER FOR INCOMING CALLS -->
-    <!-- ========================================== -->
-    <div class="incoming-toast-banner" id="incomingToastBanner" style="display: none;">
-      <div class="toast-content">
-        <div class="toast-avatar-ring">📞</div>
-        <div>
-          <b id="toastCallerTitle">Friend is calling you!</b>
-          <div id="toastCallerType" style="font-size: 0.75rem; color: #475569;">Incoming Video Call</div>
+        <div class="form-field" style="margin-top: 1rem; text-align: left;">
+          <label>Google Email</label>
+          <input type="email" id="googleCustomEmail" placeholder="e.g. nitish@gmail.com">
         </div>
-      </div>
-      <div class="toast-btns">
-        <button id="toastAcceptBtn" class="btn-toast-green">📞 Answer</button>
-        <button id="toastDeclineBtn" class="btn-toast-red">❌ Decline</button>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- MODAL: INCOMING CALL (PHONE RINGING SCREEN) -->
-    <!-- ========================================== -->
-    <div class="modal-backdrop incoming-backdrop" id="incomingCallModal" style="display: none;">
-      <div class="call-dialog incoming-dialog">
-        <div class="incoming-header-badge" id="callWaitingNotice" style="display: none;">
-          ⚡ CALL WAITING (You are already in a call)
-        </div>
-        
-        <div class="calling-pulse incoming-ring-pulse">
-          <div class="pulse-ring active"></div>
-          <div class="pulse-ring active ring-delay"></div>
-          <div class="pulse-avatar incoming-avatar" id="incomingCallerAvatar">📞</div>
+        <div class="form-field" style="margin-top: 0.5rem; text-align: left;">
+          <label>Your Name</label>
+          <input type="text" id="googleCustomName" placeholder="e.g. Nitish Singh">
         </div>
 
-        <div class="incoming-alert-tag">🔔 INCOMING CALL RINGING...</div>
-        <h2 class="incoming-caller-title" id="incomingCallerName">FRIEND IS CALLING</h2>
-        <p id="incomingCallerSubtext" style="font-size: 0.85rem; color: #64748b; margin-top: -0.25rem; margin-bottom: 0.75rem;"></p>
-        <div class="call-type-badge-incoming" id="incomingCallTypeBadge">📹 VIDEO CALL</div>
-        <p class="dialog-note" id="incomingCallSubtitle">
-          Verified friend is calling you. Click below to receive the call:
-        </p>
-
-        <div class="incoming-actions">
-          <button id="acceptCallStandardBtn" class="btn-success btn-large btn-receive-pulse">
-            <span class="btn-action-icon">📞</span> RECEIVE / ANSWER CALL
-          </button>
-
-          <div id="callWaitingButtons" class="call-waiting-button-grid" style="display: none;">
-            <button id="acceptAndMergeBtn" class="btn-info btn-large">
-              <span>👥</span> Accept & Merge (Group Call)
-            </button>
-            <button id="acceptAndHoldBtn" class="btn-warning btn-large">
-              <span>🔀</span> Accept & Hold Current Call
-            </button>
-          </div>
-
-          <button id="declineCallBtn" class="btn-danger btn-large">
-            <span>❌</span> DECLINE / REJECT
-          </button>
+        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+          <button id="googleConfirmBtn" class="btn-snap-yellow" style="flex: 1;">Confirm</button>
+          <button id="googleCancelBtn" class="btn-snap-cancel" style="flex: 1;">Cancel</button>
         </div>
       </div>
     </div>
@@ -692,6 +462,6 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>
